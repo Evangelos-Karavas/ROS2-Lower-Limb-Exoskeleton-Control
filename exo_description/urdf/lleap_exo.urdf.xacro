@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<robot name="exo" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:property name="robot_name" value="exo" />
+  <!-- Grab the joint limits. -->
+  <xacro:include filename="$(find exo_description)/urdf/lleap_exo_joint_limits.xacro" />
+  <xacro:include filename="$(find exo_description)/urdf/exo_material_colors.xacro"/>
+  <!-- link names; 1-3 map to .STL filenames -->
+  <xacro:property name="link0" value="hip_base" />
+  <xacro:property name="link1" value="thigh" />
+  <xacro:property name="link2" value="shank" />
+  <xacro:property name="link3" value="foot" />
+  <!-- simple geometry properties -->
+  <xacro:property name="torso_width" value="0.5"/>   <!-- in meters -->
+  <!-- repeated leg joint names -->
+  <xacro:property name="joint0" value="pelvis" /> <!-- hip base to torso; fixed! -->
+  <xacro:property name="joint1" value="hip" />    <!-- fixed to thigh -->
+  <xacro:property name="joint2" value="knee" />   <!-- thigh to shank -->
+  <xacro:property name="joint3" value="ankle" />  <!-- shank to foot -->
+
+  <gravity>true</gravity>
+
+  <link name="world"/>
+  <joint name="base" type="fixed">  <!-- Type should be fixed || prismatic -->
+    <origin xyz="1 0 1.3342" rpy="0 0 ${pi}" />
+    <limit lower="-10.0" upper="10.0" effort="100.0" velocity="50.0"/>
+    <parent link="world"/>
+    <child link="base_link"/>
+  </joint> 
+
+  <!-- torso: base for the model; attached to world in gazebo if whole model fixed -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0.5" rpy="0 0 0" />
+      <mass value="1" />
+      <geometry>
+        <box size="0.25 ${torso_width} 1"/>
+      </geometry>
+      <material name="red"/>
+    </visual>
+  </link>
+
+
+  <xacro:macro name="leg" params="prefix reflect">
+    <joint name="${prefix}_${joint0}_fixed_joint" type="fixed">
+      <origin xyz="0.00012638 ${reflect * torso_width/2} -0.0003763" rpy="0 0 0" />
+      <parent link="base_link"/>
+      <child link="${prefix}_${link0}"/>
+      <axis xyz="-0.0029081 -0.99996 0.0086592" />
+      <limit lower="-2.5" upper="2.5" effort="700" velocity="5" />
+    </joint>
+
+    <link name="${prefix}_${link0}">
+      <inertial>
+        <origin xyz="-0.0281418142029674 0.084195220690108 0.0136945077855137" rpy="0 0 0" />
+        <mass value="1.40107341049644" />
+        <inertia ixx="0.0057559217437971" ixy="0.000406518233708888" ixz="0.00153929909288236" iyy="0.0114198233883461" iyz="-0.000159377837584594" izz="0.00876258360043916" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="file://$(find exo_description)/meshes/${link0}.STL"/>
+        </geometry>
+        <material name="dark_gray"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>  
+          <mesh filename="file://$(find exo_description)/meshes/${link0}.STL"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- hip joint: fixed hip base to thigh (link1) -->
+    <joint name="${prefix}_${joint1}_revolute_joint" type="revolute">
+      <origin xyz="0.00012638 0.043454 -0.0003763" rpy="${pi / 2} ${pi / 2} ${pi}" />
+      <parent link="${prefix}_${link0}" />
+      <child link="${prefix}_${link1}" />
+      <!-- <axis xyz="-0.0029081 -0.99996 0.0086592" /> -->
+      <axis xyz="0 0 1" />
+      <!-- Positional joint limits partially based on joint calculations. -->
+      <limit lower="${hip_lower_radians}" upper="${hip_upper_radians}" effort="700" velocity="5" />
+    </joint>
+
+    <!-- link1 should be the thigh (joint1 to joint2).
+          In our current STL model, contains the parts of the hip and knee joint visuals. -->
+    <link name="${prefix}_${link1}">
+      <inertial>
+        <origin xyz="-0.404990833485201 0.00723950792302919 -0.0848264671155734" 
+                rpy="${pi / 2} 0 ${-(180 - 12) * pi / 180}" />
+        <mass value="2.27289407400542" />
+        <inertia ixx="0.00167557501769417" ixy="-8.47541360240001E-06" ixz="-0.00126944670009916" iyy="0.00777922506609577" iyz="-2.94088009595002E-06" izz="0.00736726690967362" />
+      </inertial>
+      <visual>
+        <!-- y part of rpy determined by measuring angles in screenshot -->
+        <origin xyz="0 0 0" rpy="${pi / 2} 0 ${-(180 - 12) * pi / 180}" />
+        <geometry>
+          <mesh filename="file://$(find exo_description)/meshes/${link1}.STL"/>
+        </geometry>
+        <material name="dark_gray"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi / 2} 0 ${-(180 - 12) * pi / 180}" />
+        <geometry>
+          <mesh filename="file://$(find exo_description)/meshes/${link1}.STL"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- knee joint: thigh (link1) to shank (link2)-->
+    <joint name="${prefix}_${joint2}_revolute_joint" type="revolute">
+      <!--<origin xyz="-0.63585 0.033681 -0.13506" rpy="0 0 0" />-->
+      <origin xyz="0.649 0.001 0.03402" rpy="0 0 0" />
+      <parent link="${prefix}_${link1}" />
+      <child link="${prefix}_${link2}" />
+      <axis xyz="0 0 1" />
+      <!-- Positional joint limits partially based on Tamar's msts (lower lim here). -->
+      <limit lower="${knee_lower_radians}" upper="${knee_upper_radians}" effort="250" velocity="1.308" />
+    </joint>
+
+    <!-- link2 should be the shank (joint2 to joint3).
+          In our current STL model, contains part of the knee joint visual. -->
+    <link name="${prefix}_${link2}">
+      <inertial>
+        <origin xyz="-0.210873385399549 -0.0276710830621445 -0.140982468689507" 
+                rpy="${pi / 2} 0 ${-(180 - 34) * pi / 180}" />
+        <mass value="1.10275445439595" />
+        <inertia ixx="0.00199044634689737" ixy="-7.54331572697175E-06" ixz="-0.00260077424938593" iyy="0.00581565190920448" iyz="-4.96554466328964E-06" izz="0.00412555905043524" />
+      </inertial>
+      <visual>
+        <!-- y part of rpy again from digital screenshot measurement -->
+        <origin xyz="0 0 0" rpy="${pi / 2} 0 ${-(180 - 34) * pi / 180}" />
+        <geometry>
+          <mesh filename="file://$(find exo_description)/meshes/${link2}.STL"/>
+        </geometry>
+        <material name="dark_gray"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi / 2} 0 ${-(180 - 34) * pi / 180}" />
+        <geometry>
+          <mesh filename="file://$(find exo_description)/meshes/${link2}.STL"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- ankle joint: shank (link2) to foot ('link3') -->
+    <joint name="${prefix}_${joint3}_revolute_joint" type="revolute">
+      <origin xyz="${0.475 + 0.075} 0.003 -0.03" rpy="0 0 0" />
+      <!-- TODO: once make simplified collisional geometries (dimensions based on SolidWorks models > ask design team), 
+      use those known dimensions to place the ankle joint origin at the bottom of the shank. 
+      Then use similar math (foot box dimensions) to place the foot link origin relative to the ankle joint origin. -->
+      <parent link="${prefix}_${link2}" />
+      <child link="${prefix}_${link3}" />
+      <axis xyz="0 0 1" />
+      <!-- Positional joint limits NOT based on Tamar's msts, but normal ranges instead. -->
+      <limit lower="${ankle_lower_radians}" upper="${ankle_upper_radians}" effort="250" velocity="1.308" />
+    </joint>
+
+    <!-- link3 should be the foot. -->
+    <link name="${prefix}_${link3}">
+      <inertial>
+        <mass value="1.10275445439595" />
+        <inertia ixx="0.00199044634689737" ixy="-7.54331572697175E-06" ixz="-0.00260077424938593" iyy="0.00581565190920448" iyz="-4.96554466328964E-06" izz="0.00412555905043524" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0.05 0" rpy="${pi / 2} 0 0" />
+        <geometry>
+          <box size="0.05 0.1 0.2"/>
+        </geometry>
+        <material name="red"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0.05 0" rpy="${pi / 2} 0 0" />
+        <geometry>
+          <box size="0.05 0.1 0.2"/>
+        </geometry>
+      </collision>
+    </link>
+  </xacro:macro>
+
+  <!-- Legs actually created. -->
+  <xacro:leg prefix="right" reflect="1" />
+  <xacro:leg prefix="left" reflect="-1.75" />
+  <dynamics damping="50.0" friction="50.0"/>
+  
+  <!-- All ros2_control needed parameters for interface between Gazebo and ROS -->
+  <ros2_control name="exosuit" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+
+    <joint name="left_hip_revolute_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="left_knee_revolute_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="left_ankle_revolute_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="right_hip_revolute_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="right_knee_revolute_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="right_ankle_revolute_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+  </ros2_control> 
+  
+   <gazebo>  <!-- Gazebo - Ros plugin for (exo_control) controller package to work-->
+    <plugin filename="libign_ros2_control-system.so" name="ign_ros2_control::IgnitionROS2ControlPlugin">
+      <robot_param>robot_description</robot_param>
+      <robot_param_node>robot_state_publisher</robot_param_node>
+      <parameters>$(find exo_control)/config/ros2_controller.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+</robot>
