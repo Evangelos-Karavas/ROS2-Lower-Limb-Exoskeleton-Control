@@ -18,12 +18,11 @@
   <xacro:property name="joint2" value="knee" />   <!-- thigh to shank -->
   <xacro:property name="joint3" value="ankle" />  <!-- shank to foot -->
 
-  <gravity>true</gravity>
-
+  <!-- Joint Type should be: fixed || prismatic || floating -->
   <link name="world"/>
-  <joint name="base" type="fixed">  <!-- Type should be fixed || prismatic -->
-    <origin xyz="1 0 1.3342" rpy="0 0 ${pi}" />
-    <limit lower="-10.0" upper="10.0" effort="100.0" velocity="50.0"/>
+  <joint name="base" type="prismatic">  
+    <origin xyz="0 0 1.23" rpy="0 0 ${pi}" />    <!-- 1.24 -->
+    <limit lower="-10.0" upper="10.0" effort="100.0" velocity="100.0"/>
     <parent link="world"/>
     <child link="base_link"/>
   </joint> 
@@ -39,7 +38,6 @@
       <material name="red"/>
     </visual>
   </link>
-
 
   <xacro:macro name="leg" params="prefix reflect">
     <joint name="${prefix}_${joint0}_fixed_joint" type="fixed">
@@ -153,7 +151,7 @@
       <child link="${prefix}_${link3}" />
       <axis xyz="0 0 1" />
       <!-- Positional joint limits NOT based on Tamar's msts, but normal ranges instead. -->
-      <limit lower="${ankle_lower_radians}" upper="${ankle_upper_radians}" effort="250" velocity="1.308" />
+      <limit lower="-0.1" upper="0.3" effort="250" velocity="1.308"/>
     </joint>
 
     <!-- link3 should be the foot. -->
@@ -165,14 +163,14 @@
       <visual>
         <origin xyz="0 0.05 0" rpy="${pi / 2} 0 0" />
         <geometry>
-          <box size="0.05 0.1 0.2"/>
+          <box size="0.03 0.1 0.17"/>
         </geometry>
         <material name="red"/>
       </visual>
       <collision>
         <origin xyz="0 0.05 0" rpy="${pi / 2} 0 0" />
         <geometry>
-          <box size="0.05 0.1 0.2"/>
+          <box size="0.03 0.1 0.17"/>
         </geometry>
       </collision>
     </link>

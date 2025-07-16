@@ -14,6 +14,8 @@ class JointPublisherFromModel(Node):
     def __init__(self):
         super().__init__('joint_publisher_from_model')
 
+        # Timer for publishing next joint angles
+        pub_timer = 0.1
         # Publisher
         self.trajectory_publisher_ = self.create_publisher(JointTrajectory, '/trajectory_controller/joint_trajectory', 10)
         # Subscriber
@@ -21,24 +23,24 @@ class JointPublisherFromModel(Node):
 
         self.joint_names = [
             'left_hip_revolute_joint',
-            'left_knee_revolute_joint',
-            'left_ankle_revolute_joint',
             'right_hip_revolute_joint',
+            'left_knee_revolute_joint',
             'right_knee_revolute_joint',
+            'left_ankle_revolute_joint',
             'right_ankle_revolute_joint'
         ]
 
         pkg_dir = get_package_share_directory('exo_control')
-        self.model_path = os.path.join(pkg_dir, 'neural_network_parameters/models', 'PV_lstm_model.keras')
-        self.excel_path = os.path.join(pkg_dir, 'neural_network_parameters/excel', 'PV_typical_lstm.xlsx')
-        self.scaler_path = os.path.join(pkg_dir, 'neural_network_parameters/scaler', 'pv_standard_scaler.save')
+        self.model_path = os.path.join(pkg_dir, 'neural_network_parameters/models', 'Timestamp_lstm_model.keras')
+        self.excel_path = os.path.join(pkg_dir, 'neural_network_parameters/excel', 'timestamps_typical_lstm.xlsx')
+        self.scaler_path = os.path.join(pkg_dir, 'neural_network_parameters/scaler', 'standard_scaler.save')
 
         self.model = load_model(self.model_path)
         self.scaler = joblib.load(self.scaler_path)
         self.get_logger().info("Loaded Keras model and scaler.")
 
         df = pd.read_excel(self.excel_path)
-        data = df.values.astype(np.float32).reshape((-1, 51, 8))
+        data = df.values.astype(np.float32).reshape((-1, 51, 6))
         self.input_window = data[-1:]
         self.get_logger().info(f"Loaded Excel input with shape {self.input_window.shape}")
 
@@ -47,15 +49,16 @@ class JointPublisherFromModel(Node):
         self.goal_sent = False
         self.last_goal_position = None
 
-        self.timer = self.create_timer(0.05, self.timer_callback)
+        self.timer = self.create_timer( pub_timer, self.timer_callback)
 
+    # Trajectory timer_callback
     def timer_callback(self):
-
+        # Only for first input from excel
         if self.predicted_traj is None:
             prediction = self.model.predict(self.input_window, verbose=0)
             last_prediction_step = prediction[0]
             predicted_deg = self.scaler.inverse_transform(last_prediction_step)
-            predicted_deg = predicted_deg[:, 2:8]
+            predicted_deg = predicted_deg
             self.predicted_traj = np.radians(predicted_deg)
             self.traj_index = 0
             self.get_logger().info("Predicted and transformed trajectory.")
@@ -70,14 +73,14 @@ class JointPublisherFromModel(Node):
             self.predicted_traj = None
             self.traj_index = 0
 
-
+    # Joint Publisher
     def publish_joint_trajectory(self, positions_from_model):
         # Change the knee values from positive to negative from nn model output to simulation in Gazebo
         for i, joint in enumerate(self.joint_names):
             if 'knee' in joint and positions_from_model[i] > 0.0:
                 positions_from_model[i] = -positions_from_model[i]
         for i, joint in enumerate(self.joint_names):
-            if 'ankle' in joint and positions_from_model[i] <= -0.4:
+            if 'ankle' in joint and positions_from_model[i] <= -0.3:
                 positions_from_model[i] = -0.4
             if 'ankle' in joint and positions_from_model[i] >= 0.36:
                 positions_from_model[i] = 0.36
@@ -121,3 +124,4 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+

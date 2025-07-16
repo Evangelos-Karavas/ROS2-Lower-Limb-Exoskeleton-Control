@@ -13,6 +13,7 @@ setup(
         ['resource/' + package_name]),
     ('share/' + package_name, ['package.xml']),
     ('share/' + package_name + '/launch', ['launch/joint_publisher.launch.py']),
+    ('share/' + package_name + '/launch', ['launch/joint_publisher_pv.launch.py']),
     ('share/' + package_name + '/launch', ['launch/gazebo_and_control.launch.py']),
     ('share/' + package_name + '/launch', ['launch/simple_publisher.launch.py']),
     ('share/' + package_name + '/config', ['config/ros2_controller.yaml']),
@@ -42,7 +43,7 @@ setup(
 
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='vaggelis',
+    maintainer='Vaggelis Karavas',
     maintainer_email='vaggeliskaravas@gmail.com',
     description='TODO: Package description',
     license='TODO: License declaration',
@@ -50,6 +51,7 @@ setup(
     entry_points={
     'console_scripts': [
         'joint_publisher = exo_control.joint_publisher:main',
+        'joint_publisher_pv = exo_control.joint_publisher_pv:main',
         'simple_publisher = exo_control.simple_publisher:main',
         ],
     },
