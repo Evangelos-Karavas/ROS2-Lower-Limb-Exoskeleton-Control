@@ -7,9 +7,11 @@ import numpy as np
 import pandas as pd
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Float32
 from builtin_interfaces.msg import Duration
 from ament_index_python.packages import get_package_share_directory
 from tensorflow.python.keras.models import load_model
+
 import joblib
 
 class JointPublisherFromModel(Node):
@@ -19,6 +21,9 @@ class JointPublisherFromModel(Node):
 
         # Publisher
         self.trajectory_publisher_ = self.create_publisher(JointTrajectory, '/trajectory_controller/joint_trajectory', 10)
+        self.phase_var_pub_left = self.create_publisher(Float32, '/phase_variable_left', 10)
+        self.phase_var_pub_right = self.create_publisher(Float32, '/phase_variable_right', 10)
+
         # Subscriber
         self.joint_state_sub = self.create_subscription(JointState, '/joint_states', self.joint_state_callback, 10)
 
@@ -80,11 +85,11 @@ class JointPublisherFromModel(Node):
         theta_touchdown_right = prediction[1][0]  # Thigh angle at touchdown (right)
         theta_min_right = prediction[1].min()  # Minimum thigh angle (right)
         c = 0.53  # Default scaling constant
-        s_left = np.zeros(len(prediction))
-        s_right = np.zeros(len(prediction))
-        
         foot_contact_binary_left = np.zeros(len(prediction))  # Initialize stance phase indicator (left)
         foot_contact_binary_right = np.zeros(len(prediction))  # Initialize stance phase indicator (right)
+        s_left = np.zeros(len(prediction))  # Initialize phase variable for left leg
+        s_right = np.zeros(len(prediction))  # Initialize phase variable for right leg
+
         for i in range(0, len(prediction[0]), 51):
             foot_contact_percent_left = 66.19
             stance_rows_left = int(51 * (foot_contact_percent_left / 100))  
@@ -93,7 +98,10 @@ class JointPublisherFromModel(Node):
             stance_rows_right = int(51 * (foot_contact_percent_right / 100))  
             foot_contact_binary_right[i:i + stance_rows_right] = 1  
         for i in range(len(prediction[0])):
-            if foot_contact_binary_left[i] == 1 and foot_contact_binary_right[i] == 0:  # Stance phase (left) and swing phase (right)
+            if foot_contact_binary_left[i] == 1 and foot_contact_binary_right[i] == 1:  # Both legs in stance phase
+                s_left[i] = ((theta_touchdown_left - prediction[0][i]) / (theta_touchdown_left - theta_min_left)) * c
+                s_right[i] = ((theta_touchdown_right - prediction[1][i]) / (theta_touchdown_right - theta_min_right)) * c
+            elif foot_contact_binary_left[i] == 1 and foot_contact_binary_right[i] == 0:  # Stance phase (left) and swing phase (right)
                 s_left[i] = ((theta_touchdown_left - prediction[0][i]) / (theta_touchdown_left - theta_min_left)) * c
                 theta_m_right = prediction[1].min()
                 s_right[i] = 1 + ((1 - s_right[i-1]) / (theta_touchdown_right - theta_m_right)) * (prediction[1][i] - theta_touchdown_right)
@@ -101,14 +109,10 @@ class JointPublisherFromModel(Node):
                 s_right[i] = ((theta_touchdown_right - prediction[1][i]) / (theta_touchdown_right - theta_min_right)) * c
                 theta_m_left = prediction[0].min()
                 s_left[i] = 1 + ((1 - s_left[i-1]) / (theta_touchdown_left - theta_m_left)) * (prediction[0][i] - theta_touchdown_left)
-            elif foot_contact_binary_left[i] == 1 and foot_contact_binary_right[i] == 1:  # Both legs in stance phase
-                s_left[i] = ((theta_touchdown_left - prediction[0][i]) / (theta_touchdown_left - theta_min_left)) * c
-                s_right[i] = ((theta_touchdown_right - prediction[1][i]) / (theta_touchdown_right - theta_min_right)) * c
-            elif foot_contact_binary_left[i] == 0 and foot_contact_binary_right[i] == 0:  # Both legs in swing phase
-                theta_m_left = prediction[0].min()
-                s_left[i] = 1 + ((1 - s_left[i-1]) / (theta_touchdown_left - theta_m_left)) * (prediction[0][i] - theta_touchdown_left)
-                theta_m_right = prediction[1].min()
-                s_right[i] = 1 + ((1 - s_right[i-1]) / (theta_touchdown_right - theta_m_right)) * (prediction[1][i] - theta_touchdown_right)
+
+            elif foot_contact_binary_left[i] == 0 and foot_contact_binary_right[i] == 0:  # Both legs in swing phase Error
+                s_left[i] = 2
+                s_right[i] = 2
         return s_left, s_right
 
     def timer_callback(self):
@@ -120,6 +124,15 @@ class JointPublisherFromModel(Node):
             predicted_deg = self.scaler.inverse_transform(self.last_prediction_step)
             phase_left, phase_right = self.compute_phase_variable(predicted_deg)
             self.phase_var = np.stack([phase_left, phase_right], axis=1)  # Shape (51, 2)
+            # Publish phase_var arrays as sequences of Float32 messages
+            for i in range(phase_left.shape[0]):
+                msg_phase_left = Float32()
+                msg_phase_right = Float32()
+                msg_phase_left.data = float(phase_left[i])
+                msg_phase_right.data = float(phase_right[i])
+                self.get_logger().info(f"Publishing phase variable left: {msg_phase_left.data}, right: {msg_phase_right.data}")
+                self.phase_var_pub_left.publish(msg_phase_left)
+                self.phase_var_pub_right.publish(msg_phase_right)
             self.predicted_index = predicted_deg
 
         # If trajectory is not finished, publish the next point of the step
@@ -131,7 +144,7 @@ class JointPublisherFromModel(Node):
             self.traj_index += 1
         # If trajectory is finished, reset the index and predicted trajectory to start the next step
         else: 
-            self.get_logger().info(f"Full step completed. With total timesteps: {self.traj_index} ")
+            # self.get_logger().info(f"Full step completed. With total timesteps: {self.traj_index} ")
             self.predicted_index = None
             self.traj_index = 0
             self.input_window = self.last_prediction_step.reshape((1, 51, 6))  # Update input window for next prediction
