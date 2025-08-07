@@ -7,7 +7,7 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 from ament_index_python.packages import get_package_share_directory
-
+from std_msgs.msg import Float32 
 
 class PhaseVariableJointPublisher(Node):
     """This node simply takes data from the Excel files (look at neural_network_parameters/excel/--all_available_excel_files--)
@@ -16,7 +16,6 @@ class PhaseVariableJointPublisher(Node):
     def __init__(self):
         super().__init__('phase_variable_joint_publisher')
 
-        pub_timer = 0.06
         self.joint_names = [
             'left_hip_revolute_joint',
             'right_hip_revolute_joint',
@@ -32,13 +31,16 @@ class PhaseVariableJointPublisher(Node):
         self.joint_state_sub = self.create_subscription(
             JointState, '/joint_states', self.joint_state_callback, 10
         )
-
+        self.phase_pub_left = self.create_publisher(Float32, '/phase_variable_left', 10)
+        self.phase_pub_right = self.create_publisher(Float32, '/phase_variable_right', 10)
         # Load data
         pkg_dir = get_package_share_directory('exo_control')
         excel_path = os.path.join(pkg_dir, 'neural_network_parameters/excel', 'timestamps_typical_cnn.xlsx')
         df = pd.read_excel(excel_path)
         self.joint_data = df.values.astype(np.float32)
         self.get_logger().info(f"Loaded joint data with shape: {self.joint_data.shape}")
+
+        self.pub_timer = 0.06
 
         # Phase variable parameters
         self.state = 'S1'
@@ -53,38 +55,85 @@ class PhaseVariableJointPublisher(Node):
         self.predicted_traj = None
         self.goal_sent = False
         self.last_goal_position = None
-        self.timer = self.create_timer(pub_timer, self.timer_callback)
+        self.current_joint_positions = None
+        self.timer = self.create_timer(self.pub_timer , self.timer_callback)
+        self.kp_knee = 20.0
+        self.kd_knee = 0.5
+        self.kp_ankle = 10.0
+        self.kd_ankle = 0.2
+        self.last_joint_pos = np.zeros(6)
+        self.state_left = 'S1'
+        self.q0h_left = None
+        self.qh_min_left = None
+        self.qhm_left = None
+        self.sm_left = None
+        self.phase_left = 0.0
 
-    def compute_phase_variable(self, qh):
-        if self.q0h is None:
-            self.q0h = qh  # Initialize on first timestep
-            self.qh_min = qh
+        self.state_right = 'S1'
+        self.q0h_right = None
+        self.qh_min_right = None
+        self.qhm_right = None
+        self.sm_right = None
+        self.phase_right = 0.0     
 
-        # FSM transitions
-        if self.state == 'S1':
-            if qh < self.qh_min:
-                self.qh_min = qh
-            if qh <= -0.15:  # replace with threshold like q_po
-                self.state = 'S2'
-        elif self.state == 'S2':
-            if qh > self.qh_min:
-                self.qhm = qh
-                self.sm = self.phase
-                self.state = 'S3'
-        elif self.state == 'S3':
-            if qh > self.q0h:
-                self.q0h = qh
-                self.qh_min = qh
-                self.state = 'S1'
+    def compute_phase_variable(self, thigh_angle, thigh_velocity, leg):
+        """
+        Computes phase variable as described in Quintero et al. (2017).
+        Implements state-based formulation with transitions and piecewise PV.
+        """
+        c = 0.53  # stance duration ratio
 
-        # Phase computation
-        if self.state in ['S1', 'S2']: # Stance Phase
-            s = ((self.q0h - qh) / (self.q0h - self.qh_min + 1e-5)) * self.c
-        else:   # Swing phase
-            s = 1.0 + ((1 - self.sm) / (self.q0h - self.qhm + 1e-5)) * (qh - self.q0h)
+        if leg == 'left':
+            if self.state_left == 'S1':
+                if self.q0h_left is None:
+                    self.q0h_left = thigh_angle
+                if self.qh_min_left is None or thigh_angle < self.qh_min_left:
+                    self.qh_min_left = thigh_angle
 
-        self.phase = max(0.0, min(1.0, s))
-        return self.phase
+                s = c * (self.q0h_left - thigh_angle) / (self.q0h_left - self.qh_min_left + 1e-5)
+
+                if thigh_angle <= self.qh_min_left and thigh_velocity > 0:
+                    self.state_left = 'S2'
+                    self.qhm_left = thigh_angle  # qh min at transition
+            elif self.state_left == 'S2':
+                if self.qh_max_left is None or thigh_angle > self.qh_max_left:
+                    self.qh_max_left = thigh_angle
+
+                s = c + (1 - c) * (thigh_angle - self.qhm_left) / (self.qh_max_left - self.qhm_left + 1e-5)
+
+                if thigh_angle >= self.qh_max_left and thigh_velocity < 0:
+                    self.state_left = 'S1'
+                    self.q0h_left = thigh_angle
+                    self.qh_min_left = None
+                    self.qh_max_left = None
+            return np.clip(s, 0.0, 1.0)
+
+        elif leg == 'right':
+            if self.state_right == 'S1':
+                if self.q0h_right is None:
+                    self.q0h_right = thigh_angle
+                if self.qh_min_right is None or thigh_angle < self.qh_min_right:
+                    self.qh_min_right = thigh_angle
+
+                s = c * (self.q0h_right - thigh_angle) / (self.q0h_right - self.qh_min_right + 1e-5)
+
+                if thigh_angle <= self.qh_min_right and thigh_velocity > 0:
+                    self.state_right = 'S2'
+                    self.qhm_right = thigh_angle
+            elif self.state_right == 'S2':
+                if self.qh_max_right is None or thigh_angle > self.qh_max_right:
+                    self.qh_max_right = thigh_angle
+
+                s = c + (1 - c) * (thigh_angle - self.qhm_right) / (self.qh_max_right - self.qhm_right + 1e-5)
+
+                if thigh_angle >= self.qh_max_right and thigh_velocity < 0:
+                    self.state_right = 'S1'
+                    self.q0h_right = thigh_angle
+                    self.qh_min_right = None
+                    self.qh_max_right = None
+            return np.clip(s, 0.0, 1.0)
+
+
 
     def timer_callback(self):
         if self.traj_index >= len(self.joint_data):
@@ -96,24 +145,56 @@ class PhaseVariableJointPublisher(Node):
         joint_positions = np.radians(joint_row)
 
         # Compute qh_dot = derivative of left hip angle
-        current_thigh_angle = joint_positions[0]
-        qh_dot = 0.0
+        current_thigh_angle_left = joint_positions[0]
+        current_thigh_angle_right = joint_positions[1]
+        qh_dot_left = 0.0
+        qh_dot_right = 0.0
         if self.prev_thigh_angle is not None:
-            qh_dot = (current_thigh_angle - self.prev_thigh_angle) / 0.03
+            qh_dot_left = (current_thigh_angle_left - self.prev_thigh_angle_left) / self.pub_timer 
+            qh_dot_right = (current_thigh_angle_right - self.prev_thigh_angle_right) / self.pub_timer 
+        self.prev_thigh_angle_left = current_thigh_angle_left
+        self.prev_thigh_angle_right = current_thigh_angle_right
 
-        # Control ankle based on qh_dot sign
-        flex = 0.2
-        if qh_dot >= 0:
-            # Swing phase → dorsiflex (positive)
-            joint_positions[4] = max(joint_positions[4], flex)  # left ankle
-            joint_positions[5] = min(joint_positions[5], -flex - 0.1)  # right ankle
-        elif qh_dot < 0:
-            # Stance phase → plantarflex (negative)
-            joint_positions[4] = min(joint_positions[4], -flex - 0.1)
-            joint_positions[5] = max(joint_positions[5], flex)
+        # --- Phase Variable ---
+        phase_left = self.compute_phase_variable(current_thigh_angle_left, qh_dot_left, 'left')
+        phase_right = self.compute_phase_variable(current_thigh_angle_left, qh_dot_right, 'right')
+        self.phase_pub_left.publish(Float32(data=phase_left))
+        self.phase_pub_right.publish(Float32(data=phase_right))
+        # --- Desired values from phase variable ---
+        desired_left_knee = -joint_positions[2] * phase_left
+        desired_right_knee = -joint_positions[3] * phase_right
+        desired_left_ankle = -joint_positions[4] * phase_left
+        desired_right_ankle = -joint_positions[5] * phase_right
 
-        # Save last thing angle for next step q_dot
-        self.prev_thigh_angle = current_thigh_angle
+        if self.current_joint_positions is None:
+            self.get_logger().info("Waiting for joint state data...")
+            return
+        
+        actual_left_knee = self.current_joint_positions[2]
+        actual_right_knee = self.current_joint_positions[3]
+        actual_left_ankle = self.current_joint_positions[4]
+        actual_right_ankle = self.current_joint_positions[5]
+
+
+        # --- Joint velocity estimate (finite difference) ---
+        dt = self.pub_timer
+        joint_velocities = (joint_positions - self.last_joint_pos) / dt
+
+        # --- PD control for knees ---
+        cmd_left_knee = self.kp_knee * (desired_left_knee - actual_left_knee) - self.kd_knee * joint_velocities[2]
+        cmd_right_knee = self.kp_knee * (desired_right_knee - actual_right_knee) - self.kd_knee * joint_velocities[3]
+
+        # --- PD control for ankles ---
+        cmd_left_ankle = self.kp_ankle * (desired_left_ankle - actual_left_ankle) - self.kd_ankle * joint_velocities[4]
+        cmd_right_ankle = self.kp_ankle * (desired_right_ankle - actual_right_ankle) - self.kd_ankle * joint_velocities[5]
+
+        # --- Apply PD commands ---
+        joint_positions[2] += cmd_left_knee * dt
+        joint_positions[3] += cmd_right_knee * dt
+        joint_positions[4] += cmd_left_ankle * dt
+        joint_positions[5] += cmd_right_ankle * dt
+
+        self.last_joint_pos = joint_positions.copy()
 
         msg = JointTrajectory()
         msg.joint_names = self.joint_names
@@ -123,21 +204,25 @@ class PhaseVariableJointPublisher(Node):
         msg.points.append(point)
 
         self.trajectory_publisher_.publish(msg)
-        self.get_logger().info(f"Published positions: {np.round(joint_positions, 2)}")
+        self.get_logger().info(f"Phase Left: {round(phase_left,2)}, Phase Right: {round(phase_right,2)} | Sent: {np.round(joint_positions, 2)}")
         self.traj_index += 1
 
 
     def joint_state_callback(self, msg):
-        if not self.goal_sent or self.last_goal_position is None:
-            return
-        if not all(name in msg.name for name in self.joint_names):
-            return
+        # Store current joint positions in the correct order
+        if all(name in msg.name for name in self.joint_names):
+            self.current_joint_positions = np.array([msg.position[msg.name.index(j)] for j in self.joint_names])
 
-        current_pos = np.array([msg.position[msg.name.index(j)] for j in self.joint_names])
-        if self.positions_close(current_pos, self.last_goal_position, tolerance=0.5):
-            self.get_logger().info("Reached goal, moving to next point.")
-            self.goal_sent = False
-            self.traj_index += 1
+    # def joint_state_callback(self, msg):
+    #     if not self.goal_sent or self.last_goal_position is None:
+    #         return
+    #     if not all(name in msg.name for name in self.joint_names):
+    #         return
+    #     current_pos = np.array([msg.position[msg.name.index(j)] for j in self.joint_names])
+    #     if self.positions_close(current_pos, self.last_goal_position, tolerance=0.5):
+    #         self.get_logger().info("Reached goal, moving to next point.")
+    #         self.goal_sent = False
+    #         self.traj_index += 1
 
     @staticmethod
     def positions_close(actual, goal, tolerance=0.1):
