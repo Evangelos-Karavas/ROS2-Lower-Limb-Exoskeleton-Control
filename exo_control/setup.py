@@ -50,7 +50,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
     'console_scripts': [
-        'joint_publisher = exo_control.joint_publisher:main',
+        'joint_publisher = exo_control.joint_publisher_nn:main',
         'joint_publisher_pv = exo_control.joint_publisher_pv:main',
         'simple_publisher = exo_control.simple_publisher:main',
         ],

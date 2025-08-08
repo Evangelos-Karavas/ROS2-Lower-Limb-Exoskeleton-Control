@@ -20,7 +20,7 @@
 
   <link name="world"/>
   <joint name="base" type="fixed">
-    <origin xyz="0 0 1.214" rpy="0 0 ${pi}" />    <!-- 1.24 -->
+    <origin xyz="0 0 2.214" rpy="0 0 ${pi}" />    <!-- 1.24 -->
     <!-- <limit lower="-10.0" upper="10.0" effort="100.0" velocity="100.0"/> -->
     <parent link="world"/>
     <child link="base_link"/>
