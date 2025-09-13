@@ -28,8 +28,8 @@ class JointPublisherFromModel(Node):
 
         # Neural Networks - Load model - excel - scaler
         pkg_dir = get_package_share_directory('exo_control')
-        self.model_path = os.path.join(pkg_dir, 'neural_network_parameters/models', 'Timestamp_lstm_model.keras')
-        self.excel_path = os.path.join(pkg_dir, 'neural_network_parameters/excel', 'timestamps_typical_lstm.xlsx')
+        self.model_path = os.path.join(pkg_dir, 'neural_network_parameters/models', 'Timestamp_lstm_model.keras') #Timestamp_cnn_model.keras
+        self.excel_path = os.path.join(pkg_dir, 'neural_network_parameters/excel', 'timestamps_typical_lstm.xlsx') #timestamps_typical_cnn.xlsx
         self.scaler_path = os.path.join(pkg_dir, 'neural_network_parameters/scaler', 'standard_scaler.save')
         self.model = load_model(self.model_path)
         self.scaler = joblib.load(self.scaler_path)
@@ -57,6 +57,8 @@ class JointPublisherFromModel(Node):
         self.traj_index = 0
         self.q_po = -8.3  # pushoff trigger thigh angle (deg)
         self.c = 0.53  # stance phase portion of stride (from paper)
+        self.last_send_time = 0.0
+        self.resend_timeout = 1.0  # seconds, tweak as needed
         # Node startup
         self.timer = self.create_timer( self.pub_timer, self.timer_callback)
 
@@ -117,59 +119,69 @@ class JointPublisherFromModel(Node):
             elif state in ['S3', 'S4']:
                 s[i] = 1 + ((1 - s_m) / (theta_td - theta_m)) * (qh - theta_td)
 
-            # Keep it in bounds
+            # Keep it bounded
             s[i] = np.clip(s[i], 0, 1)
 
         return s
 
     def timer_callback(self):
-        # Publish next point in trajectory using model output
+        # Prepare a new predicted step if needed
         if self.predicted_index is None:
-            prediction = self.model.predict(self.input_window, verbose=0)  # Prediction output is (1, 51, 6)
-            self.last_prediction_step = prediction[0]  # Shape (51, 6)
+            prediction = self.model.predict(self.input_window, verbose=0)
+            self.last_prediction_step = prediction[0]  # (51, 6)
             predicted_deg = self.scaler.inverse_transform(self.last_prediction_step)
             predicted_deg = self.filter_data(predicted_deg)
             fc_left = self.simulate_foot_contact(len(predicted_deg), 64.18)
             phase_left = self.compute_phase_variable_fsm(predicted_deg[:, 0], fc_left)
             fc_right = self.simulate_foot_contact(len(predicted_deg), 65.0)
             phase_right = self.compute_phase_variable_fsm(predicted_deg[:, 1], fc_right)
-            self.phase_var = np.stack([phase_left, phase_right], axis=1)  # Shape (51, 2)
-            # Publish phase_var arrays
-            for i in range(len(predicted_deg)):
-                msg_phase_left = Float32MultiArray()
-                msg_phase_right = Float32MultiArray()
-                msg_phase_left.data = phase_left.tolist()
-                msg_phase_right.data = phase_right.tolist()
+            self.phase_var = np.stack([phase_left, phase_right], axis=1)
+
+            # (Your phase publishers — you probably want to publish once per window, not inside a loop)
+            msg_phase_left = Float32MultiArray(); msg_phase_left.data = phase_left.tolist()
+            msg_phase_right = Float32MultiArray(); msg_phase_right.data = phase_right.tolist()
             self.phase_var_pub_left.publish(msg_phase_left)
             self.phase_var_pub_right.publish(msg_phase_right)
-            self.predicted_index = predicted_deg
 
-        # If trajectory is not finished, publish the next point of the step
-        if self.traj_index < len(self.predicted_index): 
-            next_point = self.predicted_index[self.traj_index]
-            self.publish_joint_trajectory(next_point)
-            self.last_goal_position = next_point
-            self.goal_sent = True
-            self.traj_index += 1
-        # If trajectory is finished, reset the index and predicted trajectory to start the next step
-        else: 
-            self.predicted_index = None
+            self.predicted_index = predicted_deg
             self.traj_index = 0
-            self.input_window = self.last_prediction_step.reshape((1, 51, 6))  # Update input window for next prediction
+            self.goal_sent = False
+            self.last_goal_position = None
+
+        # If we still have points to execute
+        if self.traj_index < len(self.predicted_index):
+            # Only send a new goal if no goal is currently pending
+            if not self.goal_sent:
+                next_point = self.predicted_index[self.traj_index]
+                self.publish_joint_trajectory(next_point)
+                self.last_goal_position = next_point
+                self.goal_sent = True
+                self.last_send_time = time.time()
+            else:
+                # Optional: resend the same goal if it seems to be missed/stalled (no index change)
+                if time.time() - self.last_send_time > self.resend_timeout:
+                    self.publish_joint_trajectory(self.last_goal_position)
+                    self.last_send_time = time.time()
+        else:
+            # Finished this predicted window; prep for the next
+            self.predicted_index = None
+            self.input_window = self.last_prediction_step.reshape((1, 51, 6))
+
 
     # Joint Publisher to Gazebo Simulation
     def publish_joint_trajectory(self, positions_from_model):
-        # Saturate joint limits for ankle
+        # Saturate joint limits for knees and ankles (degrees)
         for i, joint in enumerate(self.joint_names):
-            if 'knee' in joint and positions_from_model[i] > 0.0:
+            if 'knee' in joint and positions_from_model[i] >= -0.5:
                 positions_from_model[i] = -positions_from_model[i]
-
+            if 'ankle' in joint and positions_from_model[i] <= -25.0:
+                positions_from_model[i] = -25.0
+            if 'ankle' in joint and positions_from_model[i] >= 16.5:
+                positions_from_model[i] = 16.0
         msg = JointTrajectory()
         msg.joint_names = self.joint_names
         point = JointTrajectoryPoint()
         point.positions = np.radians(positions_from_model).tolist()
-        # point.positions = positions_from_model.tolist()
-        # self.get_logger().info(f"Published positions in rad: {np.round((point.positions), 2)}")
         point.time_from_start = Duration(sec=0, nanosec=300_000_000)
         msg.points.append(point)
         self.trajectory_publisher_.publish(msg)
@@ -188,12 +200,31 @@ class JointPublisherFromModel(Node):
             joint_errors = np.abs(self.current_joint_positions - np.radians(self.last_goal_position))
             joints_within_tolerance = joint_errors < error_threshold_rad
             if np.all(joints_within_tolerance):
-                self.get_logger().info("✅ All joints reached goal. Proceeding to next point.")
+                self.get_logger().info("All joints reached goal. Proceeding to next point.")
                 self.goal_sent = False
                 self.traj_index += 1
             else:
                 self.get_logger().info("Not all joints reached their goal. Holding position.")
                 # self.publish_joint_trajectory(self.last_goal_position)
+
+    def joint_state_callback(self, msg):
+        if not self.goal_sent or self.last_goal_position is None:
+            return
+        if all(name in msg.name for name in self.joint_names):
+            self.current_joint_positions = np.array(
+                [msg.position[msg.name.index(j)] for j in self.joint_names]
+            )
+            error_threshold_rad = 0.1  # radians
+            joint_errors = np.abs(self.current_joint_positions - np.radians(self.last_goal_position))
+            joints_within_tolerance = joint_errors < error_threshold_rad
+
+            if np.all(joints_within_tolerance):
+                self.get_logger().info("All joints reached goal. Proceeding to next point.")
+                self.goal_sent = False            # allow timer to send the NEXT point
+                self.traj_index += 1              # advance index HERE only
+            else:
+                # Optional: log once in a while or at debug level
+                self.get_logger().debug("Holding current goal; not all joints within tolerance.")
 
     def send_joints_to_zero(self):
         zero_positions = np.zeros(len(self.joint_names))

@@ -18,25 +18,94 @@
   <xacro:property name="joint2" value="knee" />   <!-- thigh to shank -->
   <xacro:property name="joint3" value="ankle" />  <!-- shank to foot -->
 
-  <link name="world"/>
-  <joint name="base" type="fixed">
-    <origin xyz="0 0 2.214" rpy="0 0 ${pi}" />    <!-- 1.24 -->
-    <!-- <limit lower="-10.0" upper="10.0" effort="100.0" velocity="100.0"/> -->
-    <parent link="world"/>
-    <child link="base_link"/>
-  </joint> 
+  <!-- === Free Robot. No world link. No base joint === -->
+  <!-- <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0.5" rpy="0 0 0"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.1041667" ixy="0" ixz="0"
+               iyy="0.0885417" iyz="0"
+               izz="0.0260417"/>
+    </inertial>
 
-  <!-- torso: base for the model; attached to world in gazebo if whole model fixed -->
-  <link name="base_link">
     <visual>
-      <origin xyz="0 0 0.5" rpy="0 0 0" />
-      <mass value="1" />
-      <geometry>
-        <box size="0.25 ${torso_width} 1"/>
-      </geometry>
+      <origin xyz="0 0 0.5" rpy="0 0 0"/>
+      <geometry><box size="0.25 0.5 1"/></geometry>
       <material name="red"/>
     </visual>
+    <collision>
+      <origin xyz="0 0 0.5" rpy="0 0 0"/>
+      <geometry><box size="0.25 0.5 1"/></geometry>
+    </collision>
   </link>
+  <gazebo reference="base_link">
+    <pose>0 0 1.214 0 0 3.14159</pose>
+  </gazebo> -->
+
+
+  <!-- === Allowing X and Z axis only === -->
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0.5" rpy="0 0 0"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.1041667" ixy="0" ixz="0"
+              iyy="0.0885417" iyz="0"
+              izz="0.0260417"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.5" rpy="0 0 0"/>
+      <geometry><box size="0.25 0.5 1"/></geometry>
+      <material name="red"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.5" rpy="0 0 0"/>
+      <geometry><box size="0.25 0.5 1"/></geometry>
+    </collision>
+  </link>
+  <link name="world"/>
+  <link name="slider_z">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.0002083" ixy="0" ixz="0"
+              iyy="0.0002083" iyz="0"
+              izz="0.0002083"/>
+    </inertial>
+    <collision><geometry><sphere radius="0.01"/></geometry></collision>
+    <visual><geometry><sphere radius="0.01"/></geometry></visual>
+  </link>
+
+  <link name="slider_x">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.0002083" ixy="0" ixz="0"
+              iyy="0.0002083" iyz="0"
+              izz="0.0002083"/>
+    </inertial>
+    <collision><geometry><sphere radius="0.01"/></geometry></collision>
+    <visual><geometry><sphere radius="0.01"/></geometry></visual>
+  </link>
+  <joint name="base_z" type="prismatic">
+    <origin xyz="0 0 1.214" rpy="0 0 ${pi}"/>
+    <parent link="world"/>
+    <child link="slider_z"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.5" upper="0.5" effort="500" velocity="1.0"/>
+    <dynamics damping="50.0" friction="1.0"/>
+  </joint>
+  <joint name="base_x" type="prismatic">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="slider_z"/>
+    <child link="slider_x"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-5.0" upper="5.0" effort="500" velocity="1.0"/>
+    <dynamics damping="5.0" friction="0.5"/>
+  </joint>
+  <joint name="base_to_body" type="fixed">
+    <parent link="slider_x"/>
+    <child link="base_link"/>
+  </joint>
 
   <xacro:macro name="leg" params="prefix reflect">
     <joint name="${prefix}_${joint0}_fixed_joint" type="fixed">
@@ -145,14 +214,11 @@
     <!-- ankle joint: shank (link2) to foot ('link3') -->
     <joint name="${prefix}_${joint3}_revolute_joint" type="revolute">
       <origin xyz="${0.475 + 0.075} 0.003 -0.03" rpy="0 0 0" />
-      <!-- TODO: once make simplified collisional geometries (dimensions based on SolidWorks models > ask design team), 
-      use those known dimensions to place the ankle joint origin at the bottom of the shank. 
-      Then use similar math (foot box dimensions) to place the foot link origin relative to the ankle joint origin. -->
       <parent link="${prefix}_${link2}" />
       <child link="${prefix}_${link3}" />
       <axis xyz="0 0 1" />
       <!-- Positional joint limits NOT based on Tamar's msts, but normal ranges instead. -->
-      <limit lower="-0.1" upper="0.3" effort="250" velocity="1.308"/>
+      <limit lower="-0.6" upper="0.3" effort="250" velocity="1.308"/>
       <dynamics damping="0.7" friction="0.5"/>
     </joint>
 
@@ -181,7 +247,6 @@
   <!-- Legs actually created. -->
   <xacro:leg prefix="right" reflect="1" />
   <xacro:leg prefix="left" reflect="-1.75" />
-  <dynamics damping="50.0" friction="50.0"/>
   
   <!-- All ros2_control needed parameters for interface between Gazebo and ROS -->
   <ros2_control name="exosuit" type="system">
