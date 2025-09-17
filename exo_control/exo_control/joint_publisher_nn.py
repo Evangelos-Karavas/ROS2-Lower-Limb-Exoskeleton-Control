@@ -48,7 +48,7 @@ class JointPublisherFromModel(Node):
             'right_ankle_revolute_joint'
         ]
         # All parameters for tuning the joint position publisher
-        self.pub_timer = 0.1
+        self.pub_timer = 0.05
         self.predicted_index = None
         self.goal_sent = False
         self.last_goal_position = None
@@ -187,26 +187,6 @@ class JointPublisherFromModel(Node):
         self.trajectory_publisher_.publish(msg)
         return msg
 
-    # Joint State function to update predicted values if previous is reached
-    def joint_state_callback(self, msg):
-        if not self.goal_sent or self.last_goal_position is None:
-            return
-        if all(name in msg.name for name in self.joint_names):
-            self.current_joint_positions = np.array(
-                [msg.position[msg.name.index(j)] for j in self.joint_names]
-            )
-            error_threshold_deg = 1.0  # degrees
-            error_threshold_rad = np.radians(error_threshold_deg)
-            joint_errors = np.abs(self.current_joint_positions - np.radians(self.last_goal_position))
-            joints_within_tolerance = joint_errors < error_threshold_rad
-            if np.all(joints_within_tolerance):
-                self.get_logger().info("All joints reached goal. Proceeding to next point.")
-                self.goal_sent = False
-                self.traj_index += 1
-            else:
-                self.get_logger().info("Not all joints reached their goal. Holding position.")
-                # self.publish_joint_trajectory(self.last_goal_position)
-
     def joint_state_callback(self, msg):
         if not self.goal_sent or self.last_goal_position is None:
             return
@@ -223,8 +203,9 @@ class JointPublisherFromModel(Node):
                 self.goal_sent = False            # allow timer to send the NEXT point
                 self.traj_index += 1              # advance index HERE only
             else:
-                # Optional: log once in a while or at debug level
-                self.get_logger().debug("Holding current goal; not all joints within tolerance.")
+                # Optional: log once in a while
+                self.get_logger().info("Holding current goal; not all joints within tolerance.")
+                self.goal_sent = True
 
     def send_joints_to_zero(self):
         zero_positions = np.zeros(len(self.joint_names))

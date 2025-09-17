@@ -87,7 +87,7 @@
     <visual><geometry><sphere radius="0.01"/></geometry></visual>
   </link>
   <joint name="base_z" type="prismatic">
-    <origin xyz="0 0 1.214" rpy="0 0 ${pi}"/>
+    <origin xyz="0 0 1.22" rpy="0 0 ${pi}"/>
     <parent link="world"/>
     <child link="slider_z"/>
     <axis xyz="0 0 1"/>
@@ -137,6 +137,8 @@
       </collision>
     </link>
 
+
+
     <!-- hip joint: fixed hip base to thigh (link1) -->
     <joint name="${prefix}_${joint1}_revolute_joint" type="revolute">
       <origin xyz="0.00012638 0.043454 -0.0003763" rpy="${pi / 2} ${pi / 2} ${pi}" />
@@ -183,7 +185,7 @@
       <axis xyz="0 0 1" />
       <!-- Positional joint limits partially based on Tamar's msts (lower lim here). -->
       <limit lower="${knee_lower_radians}" upper="${knee_upper_radians}" effort="250" velocity="1.308" />
-      <dynamics damping="0.5" friction="0.4"/>
+      <dynamics damping="4.0" friction="1.0"/>
     </joint>
 
     <!-- link2 should be the shank (joint2 to joint3).
