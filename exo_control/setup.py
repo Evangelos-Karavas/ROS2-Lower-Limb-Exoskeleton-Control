@@ -27,9 +27,10 @@ setup(
     ('share/exo_control/neural_network_parameters/models/', ['neural_network_parameters/models/Timestamp_lstm_model.keras']),
 
     # Load scalers
-    ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/standard_scaler.save']),
-    ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/pv_standard_scaler.save']),
-
+    ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/standard_scaler_typical_lstm.save']),
+    ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/standard_scaler_cp_lstm.save']),
+    ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/standard_scaler_typical_cnn.save']),
+    ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/standard_scaler_cp_cnn.save']),
     # Load excel of data
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/timestamps_typical_cnn.xlsx']),
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/timestamps_typical_lstm.xlsx']),
