@@ -56,7 +56,7 @@ class JointPublisherFromModel(Node):
         self.last_send_time = 0.0
         self.resend_timeout = 1.0  # seconds
         self.error_threshold_rad = 0.05  # radians
-        self.settle_cycles_required = 3  # number of consecutive OK callbacks
+        self.settle_cycles_required = 1  # number of consecutive OK callbacks
         self._consecutive_ok = 0
         self._last_js_time = None
         self._last_js_pos = None

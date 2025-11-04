@@ -92,7 +92,7 @@
     <child link="slider_z"/>
     <axis xyz="0 0 1"/>
     <limit lower="-0.5" upper="0.5" effort="500" velocity="1.0"/>
-    <dynamics damping="50.0" friction="1.0"/>
+    <dynamics damping="5.0" friction="1.0"/>
   </joint>
   <joint name="base_x" type="prismatic">
     <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -185,7 +185,7 @@
       <axis xyz="0 0 1" />
       <!-- Positional joint limits partially based on Tamar's msts (lower lim here). -->
       <limit lower="-10.0" upper="10.0" effort="250" velocity="1.308" />
-      <dynamics damping="4.0" friction="1.0"/>
+      <dynamics damping="0.4" friction="1.0"/>
     </joint>
 
     <!-- link2 should be the shank (joint2 to joint3).
@@ -283,7 +283,7 @@
   </ros2_control> 
   
    <gazebo>  <!-- Gazebo - Ros plugin for (exo_control) controller package to work-->
-    <plugin filename="libign_ros2_control-system.so" name="gz_ros2_control::IgnitionROS2ControlPlugin">
+    <plugin filename="libign_ros2_control-system.so" name="ign_ros2_control::IgnitionROS2ControlPlugin">
       <robot_param>robot_description</robot_param>
       <robot_param_node>robot_state_publisher</robot_param_node>
       <parameters>$(find exo_control)/config/ros2_controller.yaml</parameters>
