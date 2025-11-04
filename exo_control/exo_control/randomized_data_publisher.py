@@ -9,9 +9,8 @@ from builtin_interfaces.msg import Duration
 from ament_index_python.packages import get_package_share_directory
 
 class JointPublisherFromExcel(Node):
-    """This node simply takes data from the Excel files (look at neural_network_parameters/excel/--all_available_excel_files--)
-        and publishes them directly to gazebo simulation. After all points have been sent, it restarts publishing from the start
-        of the excel file."""
+    """This node takes data from all the typically developed patients from an Excel file and publishes
+     them directly to gazebo simulation. After all points have been sent, it restarts."""
     def __init__(self):
         super().__init__('joint_publisher_from_excel')
 
@@ -25,9 +24,7 @@ class JointPublisherFromExcel(Node):
             'right_ankle_revolute_joint'
         ]
 
-        self.trajectory_publisher_ = self.create_publisher(
-            JointTrajectory, '/trajectory_controller/joint_trajectory', 10
-        )
+        self.trajectory_publisher_ = self.create_publisher(JointTrajectory, '/trajectory_controller/joint_trajectory', 10)
 
         # Load joint trajectory data directly from Excel
         pkg_dir = get_package_share_directory('exo_control')
@@ -35,20 +32,22 @@ class JointPublisherFromExcel(Node):
         df = pd.read_excel(excel_path)
         self.joint_data = df.values.astype(np.float32)
         self.get_logger().info(f"Loaded joint data from Excel with shape {self.joint_data.shape}")
-
         self.traj_index = 0
         self.timer = self.create_timer(pub_rate, self.timer_callback)
 
     def timer_callback(self):
         if self.traj_index >= len(self.joint_data):
             self.get_logger().info("All joint positions sent.")
-            self.traj_index = 0  # restart if needed, or `rclpy.shutdown()` to stop
+            self.traj_index = 0
             return
         joint_positions = np.radians(self.joint_data[self.traj_index])
+        for i, joint in enumerate(self.joint_names):
+            if 'knee' in joint and joint_positions[i] >= 0.0:
+                joint_positions[i] = -joint_positions[i]
 
+        # publish trajectory message
         msg = JointTrajectory()
         msg.joint_names = self.joint_names
-
         point = JointTrajectoryPoint()
         point.positions = joint_positions.tolist()
         point.time_from_start = Duration(sec=0, nanosec=500_000_000)  # 0.5s

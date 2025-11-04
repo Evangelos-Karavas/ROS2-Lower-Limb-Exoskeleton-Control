@@ -87,7 +87,7 @@
     <visual><geometry><sphere radius="0.01"/></geometry></visual>
   </link>
   <joint name="base_z" type="prismatic">
-    <origin xyz="0 0 1.22" rpy="0 0 ${pi}"/>
+    <origin xyz="0 0 2.22" rpy="0 0 ${pi}"/>
     <parent link="world"/>
     <child link="slider_z"/>
     <axis xyz="0 0 1"/>
@@ -283,7 +283,7 @@
   </ros2_control> 
   
    <gazebo>  <!-- Gazebo - Ros plugin for (exo_control) controller package to work-->
-    <plugin filename="libign_ros2_control-system.so" name="ign_ros2_control::IgnitionROS2ControlPlugin">
+    <plugin filename="libign_ros2_control-system.so" name="gz_ros2_control::IgnitionROS2ControlPlugin">
       <robot_param>robot_description</robot_param>
       <robot_param_node>robot_state_publisher</robot_param_node>
       <parameters>$(find exo_control)/config/ros2_controller.yaml</parameters>

@@ -1,6 +1,6 @@
 controller_manager:
   ros__parameters:
-    update_rate: 1000
+    update_rate: 10000
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
@@ -28,16 +28,16 @@ trajectory_controller:
     interpolate_from_desired_state: false
 
     gains:
-      left_hip_revolute_joint: {p: 16.0, i: 0.001, d: 5.7}
-      left_knee_revolute_joint: {p: 24.0, i: 0.0001, d: 21.0}
-      left_ankle_revolute_joint: {p: 5.0, i: 0.005, d: 2.5}
-      right_hip_revolute_joint: {p: 16.0, i: 0.001, d: 5.7}
-      right_knee_revolute_joint: {p: 24.0, i: 0.0001, d: 21.0}
-      right_ankle_revolute_joint: {p: 5.0, i: 0.005, d: 2.5}
+      left_hip_revolute_joint: {p: 900.0, i: 0.01, d: 10.0}
+      left_knee_revolute_joint: {p: 100.0, i: 0.01, d: 10.0}
+      left_ankle_revolute_joint: {p: 50.0, i: 0.0, d: 2.5}
+      right_hip_revolute_joint: {p: 900.0, i: 0.01, d: 10.0}
+      right_knee_revolute_joint: {p: 100.0, i: 0.01, d: 10.0}
+      right_ankle_revolute_joint: {p: 50.0, i: 0.0, d: 2.5}
 
     constraints:
       stopped_velocity_tolerance: 0.2
-      goal_time: 0.05
+      goal_time: 1.0
       left_hip_revolute_joint: {trajectory: 10.1, goal: 10.0}
       left_knee_revolute_joint: {trajectory: 10.1, goal: 10.0}
       left_ankle_revolute_joint: {trajectory: 10.1, goal: 10.0}

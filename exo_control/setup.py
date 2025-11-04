@@ -14,8 +14,8 @@ setup(
     ('share/' + package_name, ['package.xml']),
     ('share/' + package_name + '/launch', ['launch/joint_publisher.launch.py']),
     ('share/' + package_name + '/launch', ['launch/joint_publisher_pv.launch.py']),
-    ('share/' + package_name + '/launch', ['launch/gazebo_and_control.launch.py']),
-    ('share/' + package_name + '/launch', ['launch/simple_publisher.launch.py']),
+    ('share/' + package_name + '/launch', ['launch/data_publisher.launch.py']),
+    ('share/' + package_name + '/launch', ['launch/randomized_data_publisher.launch.py']),
     ('share/' + package_name + '/config', ['config/ros2_controller.yaml']),
 
     ('share/exo_control/config', ['config/ros2_controller.yaml']),
@@ -40,6 +40,8 @@ setup(
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/PV_typical_lstm.xlsx']),
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/PV_cp_cnn.xlsx']),
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/PV_cp_lstm.xlsx']),
+    ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/data_healthy.xlsx']),
+    ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/data_cp.xlsx']),
     ],
 
     install_requires=['setuptools'],
@@ -53,7 +55,8 @@ setup(
     'console_scripts': [
         'joint_publisher = exo_control.joint_publisher_nn:main',
         'joint_publisher_pv = exo_control.joint_publisher_pv:main',
-        'simple_publisher = exo_control.simple_publisher:main',
+        'data_publisher = exo_control.data_publisher:main',
+        'randomized_data_publisher = exo_control.randomized_data_publisher:main',
         ],
     },
 )
