@@ -59,7 +59,7 @@ class JointPublisherFromExcel(Node):
         msg.joint_names = self.joint_names
         point = JointTrajectoryPoint()
         point.positions = joint_positions.tolist()
-        point.time_from_start = Duration(sec=0, nanosec=500_000_000)
+        point.time_from_start = Duration(sec=0, nanosec=100_000_000)
         msg.points.append(point)
 
         self.trajectory_publisher_.publish(msg)
