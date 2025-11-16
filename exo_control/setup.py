@@ -16,6 +16,7 @@ setup(
     ('share/' + package_name + '/launch', ['launch/joint_publisher_pv.launch.py']),
     ('share/' + package_name + '/launch', ['launch/data_publisher.launch.py']),
     ('share/' + package_name + '/launch', ['launch/randomized_data_publisher.launch.py']),
+    ('share/' + package_name + '/launch', ['launch/joint_publisher_kinetics.launch.py']),
     ('share/' + package_name + '/config', ['config/ros2_controller.yaml']),
 
     ('share/exo_control/config', ['config/ros2_controller.yaml']),
@@ -25,12 +26,16 @@ setup(
     ('share/exo_control/neural_network_parameters/models/', ['neural_network_parameters/models/PV_lstm_model.keras']),
     ('share/exo_control/neural_network_parameters/models/', ['neural_network_parameters/models/Timestamp_cnn_model.keras']),
     ('share/exo_control/neural_network_parameters/models/', ['neural_network_parameters/models/Timestamp_lstm_model.keras']),
+    ('share/exo_control/neural_network_parameters/models/', ['neural_network_parameters/models/dynamics_lstm.keras']),
 
     # Load scalers
     ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/standard_scaler_typical_lstm.save']),
     ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/standard_scaler_cp_lstm.save']),
     ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/standard_scaler_typical_cnn.save']),
     ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/standard_scaler_cp_cnn.save']),
+    ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/ang_scaler.save']),
+    ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/dyn_scaler.save']),
+
     # Load excel of data
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/timestamps_typical_cnn.xlsx']),
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/timestamps_typical_lstm.xlsx']),
@@ -42,6 +47,8 @@ setup(
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/PV_cp_lstm.xlsx']),
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/data_healthy.xlsx']),
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/data_cp.xlsx']),
+    ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/next_stride_angles.xlsx']),
+    ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/data_healthy_dynamics.xlsx']),
     ],
 
     install_requires=['setuptools'],
@@ -57,6 +64,7 @@ setup(
         'joint_publisher_pv = exo_control.joint_publisher_pv:main',
         'data_publisher = exo_control.data_publisher:main',
         'randomized_data_publisher = exo_control.randomized_data_publisher:main',
+        'joint_publisher_kinetics = exo_control.joint_publisher_kinetics:main',
         ],
     },
 )
