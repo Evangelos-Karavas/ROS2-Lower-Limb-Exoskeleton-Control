@@ -17,6 +17,8 @@ setup(
     ('share/' + package_name + '/launch', ['launch/data_publisher.launch.py']),
     ('share/' + package_name + '/launch', ['launch/randomized_data_publisher.launch.py']),
     ('share/' + package_name + '/launch', ['launch/joint_publisher_kinetics.launch.py']),
+    ('share/' + package_name + '/launch', ['launch/joint_publisher_rl.launch.py']),
+
     ('share/' + package_name + '/config', ['config/ros2_controller.yaml']),
 
     ('share/exo_control/config', ['config/ros2_controller.yaml']),
@@ -27,6 +29,7 @@ setup(
     ('share/exo_control/neural_network_parameters/models/', ['neural_network_parameters/models/Timestamp_cnn_model.keras']),
     ('share/exo_control/neural_network_parameters/models/', ['neural_network_parameters/models/Timestamp_lstm_model.keras']),
     ('share/exo_control/neural_network_parameters/models/', ['neural_network_parameters/models/dynamics_lstm.keras']),
+    ('share/exo_control/neural_network_parameters/models/', ['neural_network_parameters/models/exo_policy.zip']),
 
     # Load scalers
     ('share/exo_control/neural_network_parameters/scaler', ['neural_network_parameters/scaler/standard_scaler_typical_lstm.save']),
@@ -49,6 +52,7 @@ setup(
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/data_cp.xlsx']),
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/next_stride_angles.xlsx']),
     ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/data_healthy_dynamics.xlsx']),
+    ('share/exo_control/neural_network_parameters/excel', ['neural_network_parameters/excel/corrected_cp_gait.npy']),
     ],
 
     install_requires=['setuptools'],
@@ -64,7 +68,8 @@ setup(
         'joint_publisher_pv = exo_control.joint_publisher_pv:main',
         'data_publisher = exo_control.data_publisher:main',
         'randomized_data_publisher = exo_control.randomized_data_publisher:main',
-        'joint_publisher_kinetics = exo_control.joint_publisher_kinetics:main',
+        'joint_publisher_kinetics = exo_control.joint_publisher_kinetics:main',\
+        'joint_publisher_rl = exo_control.joint_publisher_rl:main',
         ],
     },
 )
