@@ -97,4 +97,6 @@ The exo_control package uses **TensorFlow/Keras** models trained from gait datas
 
 
 For more information about the NN models and preprocessing of the datasets please look at the project [Neural-Networks-For-Gait-Analysis-and-Prediction](https://github.com/Evangelos-Karavas/Neural-Networks-For-Gait-Analysis-and-Prediction)
+
+
 Thank you kindly [MaxLewter16](https://github.com/MaxLewter16) for the help and inspiration from your project LLEAP.
