@@ -129,29 +129,27 @@ class NextStepPublisher(Node):
 
     # ---------------------------------------------------------
     def control_loop(self):
-        """Send next target only when previous is reached."""
+        """Send next target only when previous is reached, loop stride forever."""
 
         if self.last_js is None:
             return
 
-        # If we have finished all frames
+        # If we have finished all frames → restart from the beginning
         if self.current_idx >= len(self.predicted):
-            self.get_logger().info("Finished executing predicted stride.")
-            rclpy.shutdown()
-            return
+            self.get_logger().info("Completed one predicted stride, restarting.")
+            self.current_idx = 0
+            self.target = None
 
         # If no current target: send one
         if self.target is None:
-            self.send_frame(self.predicted[self.current_idx])
             self.target = self.predicted[self.current_idx]
+            self.send_frame(self.target)
             return
 
-        # Check if reached
+        # Check if reached (joint_state close enough to target)
         if np.allclose(self.last_js, np.radians(self.target), atol=0.05):
             self.current_idx += 1
             self.target = None
-
-
 
     # ---------------------------------------------------------
     def send_frame(self, deg6):

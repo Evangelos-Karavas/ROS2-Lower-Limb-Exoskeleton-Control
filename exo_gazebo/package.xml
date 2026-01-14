@@ -4,8 +4,7 @@
   <name>exo_gazebo</name>
   <version>0.1.0</version>
   <description>Run simulated robot through gazebo.</description>
-  <maintainer email="lewtermax@gmail.com">mlewt</maintainer>
-  <maintainer email="kylequinlan09@gmail.com">Kyle Quinlan</maintainer>
+  <maintainer email="vaggeliskaravas@gmail.com">mlewt</maintainer>
   <license>BSD-3-Clause</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

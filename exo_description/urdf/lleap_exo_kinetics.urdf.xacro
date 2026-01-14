@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<robot name="exo" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:property name="robot_name" value="exo" />
+  <xacro:include filename="$(find exo_description)/urdf/lleap_exo_joint_limits.xacro" />
+  <xacro:include filename="$(find exo_description)/urdf/exo_material_colors.xacro"/>
+
+  <xacro:property name="link0" value="hip_base" />
+  <xacro:property name="link1" value="thigh" />
+  <xacro:property name="link2" value="shank" />
+  <xacro:property name="link3" value="foot" />
+
+  <xacro:property name="torso_width" value="0.5"/>
+  <xacro:property name="joint0" value="pelvis" />
+  <xacro:property name="joint1" value="hip" />
+  <xacro:property name="joint2" value="knee" />
+  <xacro:property name="joint3" value="ankle" />
+  <!-- === Allowing X and Z axis only === -->
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0.5" rpy="0 0 0"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.1041667" ixy="0" ixz="0"
+              iyy="0.0885417" iyz="0"
+              izz="0.0260417"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.5" rpy="0 0 0"/>
+      <geometry><box size="0.25 0.5 1"/></geometry>
+      <material name="red"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.5" rpy="0 0 0"/>
+      <geometry><box size="0.25 0.5 1"/></geometry>
+    </collision>
+  </link>
+  <link name="world"/>
+  <link name="slider_z">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.0002083" ixy="0" ixz="0"
+              iyy="0.0002083" iyz="0"
+              izz="0.0002083"/>
+    </inertial>
+    <collision><geometry><sphere radius="0.01"/></geometry></collision>
+    <visual><geometry><sphere radius="0.01"/></geometry></visual>
+  </link>
+
+  <link name="slider_x">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.0002083" ixy="0" ixz="0"
+              iyy="0.0002083" iyz="0"
+              izz="0.0002083"/>
+    </inertial>
+    <collision><geometry><sphere radius="0.01"/></geometry></collision>
+    <visual><geometry><sphere radius="0.01"/></geometry></visual>
+  </link>
+  <joint name="base_z" type="prismatic">
+    <origin xyz="0 0 2.22" rpy="0 0 ${pi}"/>
+    <parent link="world"/>
+    <child link="slider_z"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.5" upper="0.5" effort="500" velocity="1.0"/>
+    <dynamics damping="5.0" friction="1.0"/>
+  </joint>
+  <joint name="base_x" type="prismatic">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="slider_z"/>
+    <child link="slider_x"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-5.0" upper="5.0" effort="500" velocity="1.0"/>
+    <dynamics damping="5.0" friction="0.5"/>
+  </joint>
+  <joint name="base_to_body" type="fixed">
+    <parent link="slider_x"/>
+    <child link="base_link"/>
+  </joint>
+
+
+  <!-- Helper macro: 3DOF joint implemented as 3 revolute joints with 2 dummy links -->
+  <xacro:macro name="triple_revolute" params="
+      base_link child_link prefix jointname
+      origin_xyz origin_rpy
+      limit_lower limit_upper limit_effort limit_velocity
+      damping friction">
+
+    <!-- Dummy links -->
+    <link name="${prefix}_${jointname}_dummy_1">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.0001"/>
+        <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+      </inertial>
+    </link>
+    <link name="${prefix}_${jointname}_dummy_2">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.0001"/>
+        <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+      </inertial>
+    </link>
+
+    <!-- Roll (X) -->
+    <joint name="${prefix}_${jointname}_roll_joint" type="revolute">
+      <origin xyz="${origin_xyz}" rpy="${origin_rpy}" />
+      <parent link="${base_link}" />
+      <child link="${prefix}_${jointname}_dummy_1" />
+      <axis xyz="1 0 0" />
+      <limit lower="${limit_lower}" upper="${limit_upper}" effort="${limit_effort}" velocity="${limit_velocity}" />
+      <dynamics damping="${damping}" friction="${friction}"/>
+    </joint>
+
+    <!-- Pitch (Y) -->
+    <joint name="${prefix}_${jointname}_pitch_joint" type="revolute">
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <parent link="${prefix}_${jointname}_dummy_1" />
+      <child link="${prefix}_${jointname}_dummy_2" />
+      <axis xyz="0 1 0" />
+      <limit lower="${limit_lower}" upper="${limit_upper}" effort="${limit_effort}" velocity="${limit_velocity}" />
+      <dynamics damping="${damping}" friction="${friction}"/>
+    </joint>
+
+    <!-- Yaw (Z) -->
+    <joint name="${prefix}_${jointname}_yaw_joint" type="revolute">
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <parent link="${prefix}_${jointname}_dummy_2" />
+      <child link="${child_link}" />
+      <axis xyz="0 0 1" />
+      <limit lower="${limit_lower}" upper="${limit_upper}" effort="${limit_effort}" velocity="${limit_velocity}" />
+      <dynamics damping="${damping}" friction="${friction}"/>
+    </joint>
+
+  </xacro:macro>
+
+  <xacro:macro name="leg" params="prefix reflect">
+    <!-- pelvis fixed joint unchanged -->
+    <joint name="${prefix}_${joint0}_fixed_joint" type="fixed">
+      <origin xyz="0.00012638 ${reflect * torso_width/2} -0.0003763" rpy="0 0 0" />
+      <parent link="base_link"/>
+      <child link="${prefix}_${link0}"/>
+    </joint>
+
+    <!-- link0 unchanged -->
+    <link name="${prefix}_${link0}">
+      <!-- keep your inertial/visual/collision exactly as before -->
+      <inertial>
+        <origin xyz="-0.0281418142029674 0.084195220690108 0.0136945077855137" rpy="0 0 0" />
+        <mass value="1.40107341049644" />
+        <inertia ixx="0.0057559217437971" ixy="0.000406518233708888" ixz="0.00153929909288236"
+                 iyy="0.0114198233883461" iyz="-0.000159377837584594" izz="0.00876258360043916" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry><mesh filename="file://$(find exo_description)/meshes/${link0}.STL"/></geometry>
+        <material name="dark_gray"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry><mesh filename="file://$(find exo_description)/meshes/${link0}.STL"/></geometry>
+      </collision>
+    </link>
+
+    <!-- link1 (thigh) unchanged definition (but will now be connected through 3DOF hip) -->
+    <link name="${prefix}_${link1}">
+      <inertial>
+        <origin xyz="-0.404990833485201 0.00723950792302919 -0.0848264671155734"
+                rpy="${pi / 2} 0 ${-(180 - 12) * pi / 180}" />
+        <mass value="2.27289407400542" />
+        <inertia ixx="0.00167557501769417" ixy="-8.47541360240001E-06" ixz="-0.00126944670009916"
+                 iyy="0.00777922506609577" iyz="-2.94088009595002E-06" izz="0.00736726690967362" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi / 2} 0 ${-(180 - 12) * pi / 180}" />
+        <geometry><mesh filename="file://$(find exo_description)/meshes/${link1}.STL"/></geometry>
+        <material name="dark_gray"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi / 2} 0 ${-(180 - 12) * pi / 180}" />
+        <geometry><mesh filename="file://$(find exo_description)/meshes/${link1}.STL"/></geometry>
+      </collision>
+    </link>
+
+    <!-- HIP becomes 3DOF: link0 -> link1 -->
+    <xacro:triple_revolute
+      base_link="${prefix}_${link0}"
+      child_link="${prefix}_${link1}"
+      prefix="${prefix}"
+      jointname="hip"
+      origin_xyz="0.00012638 0.043454 -0.0003763"
+      origin_rpy="${pi / 2} ${pi / 2} ${pi}"
+      limit_lower="-10.0"
+      limit_upper="10.0"
+      limit_effort="700"
+      limit_velocity="5"
+      damping="0.3"
+      friction="0.1"/>
+
+    <!-- link2 unchanged -->
+    <link name="${prefix}_${link2}">
+      <inertial>
+        <origin xyz="-0.210873385399549 -0.0276710830621445 -0.140982468689507"
+                rpy="${pi / 2} 0 ${-(180 - 34) * pi / 180}" />
+        <mass value="1.10275445439595" />
+        <inertia ixx="0.00199044634689737" ixy="-7.54331572697175E-06" ixz="-0.00260077424938593"
+                 iyy="0.00581565190920448" iyz="-4.96554466328964E-06" izz="0.00412555905043524" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi / 2} 0 ${-(180 - 34) * pi / 180}" />
+        <geometry><mesh filename="file://$(find exo_description)/meshes/${link2}.STL"/></geometry>
+        <material name="dark_gray"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi / 2} 0 ${-(180 - 34) * pi / 180}" />
+        <geometry><mesh filename="file://$(find exo_description)/meshes/${link2}.STL"/></geometry>
+      </collision>
+    </link>
+
+    <!-- KNEE becomes 3DOF: link1 -> link2 -->
+    <xacro:triple_revolute
+      base_link="${prefix}_${link1}"
+      child_link="${prefix}_${link2}"
+      prefix="${prefix}"
+      jointname="knee"
+      origin_xyz="0.649 0.001 0.03402"
+      origin_rpy="0 0 0"
+      limit_lower="-10.0"
+      limit_upper="10.0"
+      limit_effort="250"
+      limit_velocity="1.308"
+      damping="0.4"
+      friction="1.0"/>
+
+    <!-- link3 unchanged -->
+    <link name="${prefix}_${link3}">
+      <inertial>
+        <mass value="1.10275445439595" />
+        <inertia ixx="0.00199044634689737" ixy="-7.54331572697175E-06" ixz="-0.00260077424938593"
+                 iyy="0.00581565190920448" iyz="-4.96554466328964E-06" izz="0.00412555905043524" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0.05 0" rpy="${pi / 2} 0 0" />
+        <geometry><box size="0.03 0.1 0.17"/></geometry>
+        <material name="red"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0.05 0" rpy="${pi / 2} 0 0" />
+        <geometry><box size="0.03 0.1 0.17"/></geometry>
+      </collision>
+    </link>
+
+    <!-- ANKLE becomes 3DOF: link2 -> link3 -->
+    <xacro:triple_revolute
+      base_link="${prefix}_${link2}"
+      child_link="${prefix}_${link3}"
+      prefix="${prefix}"
+      jointname="ankle"
+      origin_xyz="${0.475 + 0.075} 0.003 -0.03"
+      origin_rpy="0 0 0"
+      limit_lower="-10.0"
+      limit_upper="10.0"
+      limit_effort="250"
+      limit_velocity="1.308"
+      damping="0.7"
+      friction="0.5"/>
+
+  </xacro:macro>
+
+  <xacro:leg prefix="right" reflect="1" />
+  <xacro:leg prefix="left" reflect="-1.75" />
+
+  <!-- ros2_control now needs to expose 18 joints -->
+  <ros2_control name="exosuit" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+
+    <!-- LEFT -->
+    <joint name="left_hip_roll_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+    <joint name="left_hip_pitch_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+    <joint name="left_hip_yaw_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+
+    <joint name="left_knee_roll_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+    <joint name="left_knee_pitch_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+    <joint name="left_knee_yaw_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+
+    <joint name="left_ankle_roll_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+    <joint name="left_ankle_pitch_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+    <joint name="left_ankle_yaw_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+
+    <!-- RIGHT -->
+    <joint name="right_hip_roll_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+    <joint name="right_hip_pitch_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+    <joint name="right_hip_yaw_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+
+    <joint name="right_knee_roll_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+    <joint name="right_knee_pitch_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+    <joint name="right_knee_yaw_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+
+    <joint name="right_ankle_roll_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+    <joint name="right_ankle_pitch_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+    <joint name="right_ankle_yaw_joint"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/></joint>
+  </ros2_control>
+
+  <!-- Your Gazebo plugin block: consider making this consistent (gz vs ign),
+       but leaving it unchanged here to match your current setup. -->
+  <gazebo>
+    <plugin filename="libign_ros2_control-system.so" name="ign_ros2_control::IgnitionROS2ControlPlugin">
+      <robot_param>robot_description</robot_param>
+      <robot_param_node>robot_state_publisher</robot_param_node>
+      <parameters>$(find exo_control)/config/ros2_controller_kinetics.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+</robot>

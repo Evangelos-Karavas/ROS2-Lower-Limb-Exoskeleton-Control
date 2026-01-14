@@ -145,7 +145,7 @@ class JointPublisherFromModel(Node):
             msg.points.append(point)
 
         # Optional: log first point briefly
-        self.get_logger().debug(f"Publishing segment of {seg.shape[0]} points. First(rad): {np.round(np.radians(seg[0]), 3)}")
+        self.get_logger().info(f"Publishing segment of {seg.shape[0]} points. First(rad): {np.round(np.radians(seg[0]), 3)}")
 
         self.trajectory_publisher_.publish(msg)
 
