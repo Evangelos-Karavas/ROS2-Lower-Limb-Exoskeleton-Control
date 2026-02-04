@@ -38,8 +38,6 @@ It integrates **simulation**, **control**, and **visualization** in Gazebo, Move
 ## 🚀 Launching:
 ``` 
 colcon build
-```
-```
 source install/setup.bash
 ```
 ```

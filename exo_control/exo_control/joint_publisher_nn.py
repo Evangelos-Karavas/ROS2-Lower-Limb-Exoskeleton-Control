@@ -16,7 +16,7 @@ import subprocess
 
 class JointPublisherFromModel(Node):
     """
-    Streams LSTM-predicted joint positions to ros2_control by publishing
+    Streams LSTM/CNN joint positions to ros2_control by publishing
     multi-point JointTrajectory segments (sliding horizon).
     """
 
@@ -34,9 +34,9 @@ class JointPublisherFromModel(Node):
 
         # --- Load model + scaler + initial window from Excel ---
         pkg_dir = get_package_share_directory('exo_control')
-        self.model_path = os.path.join(pkg_dir, 'neural_network_parameters/models', 'Timestamp_lstm_model.keras')
+        self.model_path = os.path.join(pkg_dir, 'neural_network_parameters/models', 'Timestamp_cnn_model.keras')
         self.excel_path = os.path.join(pkg_dir, 'neural_network_parameters/excel', 'timestamps_cp_lstm.xlsx')
-        self.scaler_path = os.path.join(pkg_dir, 'neural_network_parameters/scaler', 'standard_scaler_typical_lstm.save')
+        self.scaler_path = os.path.join(pkg_dir, 'neural_network_parameters/scaler', 'standard_scaler_typical_cnn.save')
 
         self.model = load_model(self.model_path)
         self.scaler = joblib.load(self.scaler_path)
@@ -108,10 +108,6 @@ class JointPublisherFromModel(Node):
         self.traj_index = 0
 
     def _roll_to_next_window(self):
-        """
-        After finishing the current window, predict the next window and create
-        a smooth transition from the previous end.
-        """
         next_pred_scaled = self._predict_next_window_scaled(self.input_window)
 
         # Smooth ramp from end of previous to beginning of next
@@ -143,9 +139,7 @@ class JointPublisherFromModel(Node):
             point.positions = np.radians(seg[i]).tolist()
             point.time_from_start = Duration(sec=0, nanosec=int((i + 1) * dt * 1e9))
             msg.points.append(point)
-
-        # Optional: log first point briefly
-        self.get_logger().info(f"Publishing segment of {seg.shape[0]} points. First(rad): {np.round(np.radians(seg[0]), 3)}")
+        self.get_logger().info(f"Publishing rad: {np.round(np.radians(seg[0]), 3)}")
 
         self.trajectory_publisher_.publish(msg)
 

@@ -14,7 +14,7 @@
   <url type="bugtracker">https://github.com/ros-planning/moveit2/issues</url>
   <url type="repository">https://github.com/ros-planning/moveit2</url>
 
-  <author email="kylequinlan09@gmail.com">Kyle Quinlan</author>
+  <author email="vaggeliskaravas@gmail.com">Vaggelis Karavas</author>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

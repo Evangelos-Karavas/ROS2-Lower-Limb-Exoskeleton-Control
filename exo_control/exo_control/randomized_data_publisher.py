@@ -14,7 +14,7 @@ class JointPublisherFromExcel(Node):
     def __init__(self):
         super().__init__('joint_publisher_from_excel')
 
-        pub_rate = 0.1  # seconds between publishes
+        pub_rate = 0.4  # seconds between publishes
         self.joint_names = [
             'left_hip_revolute_joint',
             'right_hip_revolute_joint',
