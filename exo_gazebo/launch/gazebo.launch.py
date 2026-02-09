@@ -1,6 +1,6 @@
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, Command, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -62,11 +62,60 @@ def generate_launch_description():
         ]),
         launch_arguments={'gz_args': '-r empty.sdf'}.items()
     )
+    # Bridge contact topics
+    bridge_contacts = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        output='screen',
+        arguments=[
+            '/world/empty/model/exosuit/link/left_foot/sensor/left_sole_contact/contact'
+            '@ros_gz_interfaces/msg/Contacts[ignition.msgs.Contacts',
+            '/world/empty/model/exosuit/link/right_foot/sensor/right_sole_contact/contact'
+            '@ros_gz_interfaces/msg/Contacts[ignition.msgs.Contacts',
+        ],
+        remappings=[
+            (
+                '/world/empty/model/exosuit/link/left_foot/sensor/left_sole_contact/contact',
+                '/left_sole/contacts'
+            ),
+            (
+                '/world/empty/model/exosuit/link/right_foot/sensor/right_sole_contact/contact',
+                '/right_sole/contacts'
+            ),
+        ],
+        parameters=[{'use_sim_time': use_sim_time}],
+    )
 
+    bridge_after_spawn = TimerAction(
+        period=3.0,
+        actions=[bridge_contacts]
+    )
+
+    foot_contact_bool = Node(
+        package='exo_control',
+        executable='foot_contact_bool',
+        output='screen',
+        parameters=[{
+            'use_sim_time': False,
+            'left_contacts_topic': '/left_sole/contacts',
+            'right_contacts_topic': '/right_sole/contacts',
+            'left_bool_topic': '/left_sole/in_contact',
+            'right_bool_topic': '/right_sole/in_contact',
+            'hold_time_sec': 0.02,
+            'publish_rate_hz': 20.0,
+        }]
+    )
+
+    contacts_bool_after_bridge = TimerAction(
+        period=3.5,
+        actions=[foot_contact_bool]
+    )
     return LaunchDescription([
         declare_use_sim_time,
         set_gz_resource_path,
         robot_state_publisher,
         gz_sim,
         spawn_entity,
+        bridge_after_spawn,
+        contacts_bool_after_bridge
     ])

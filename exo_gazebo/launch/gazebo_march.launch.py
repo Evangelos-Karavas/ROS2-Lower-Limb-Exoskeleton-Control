@@ -114,13 +114,13 @@ def generate_launch_description():
         executable='foot_contact_bool',
         output='screen',
         parameters=[{
-            'use_sim_time': False,   # <-- IMPORTANT
+            'use_sim_time': False,
             'left_contacts_topic': '/left_sole/contacts',
             'right_contacts_topic': '/right_sole/contacts',
             'left_bool_topic': '/left_sole/in_contact',
             'right_bool_topic': '/right_sole/in_contact',
             'hold_time_sec': 0.02,
-            'publish_rate_hz': 20.0,  # if your node supports it
+            'publish_rate_hz': 20.0,
         }]
     )
 

@@ -123,10 +123,10 @@ class PVExcelRecursivePublisher(Node):
 
         # ---------------- parameters ----------------
         self.declare_parameter("window", 51)
-        self.declare_parameter("pub_timer", 0.3)   # 0.3s = 3 Hz publishing
+        self.declare_parameter("pub_timer", 0.6)   # 0.3s = 3 Hz publishing
         self.declare_parameter("segment_len", 3)
 
-        self.declare_parameter("invert_knee_if_positive", False)
+        self.declare_parameter("invert_knee_if_positive", True)
 
         self.declare_parameter("pv_joint_left", "left_hip_revolute_joint")
         self.declare_parameter("pv_joint_right", "right_hip_revolute_joint")
@@ -143,13 +143,13 @@ class PVExcelRecursivePublisher(Node):
         self.declare_parameter("pv_vel_eps_deg_s", 5.0)
 
         # PV rollout progression for preview points
-        self.declare_parameter("assumed_stride_period", 1.2)  # seconds per stride
+        self.declare_parameter("assumed_stride_period", 1.6)  # seconds per stride
 
         # Files
-        self.declare_parameter("model_file", "PV_rolling_next_tick_lstm.keras")
-        self.declare_parameter("scaler_pv_file", "scaler_pv_lstm.save")
-        self.declare_parameter("scaler_ang_file", "scaler_angles_lstm.save")
-        self.declare_parameter("excel_file", "rolling_gt_next_tick_with_pv_cnn.xlsx")
+        self.declare_parameter("model_file", "PV_rolling_next_tick_cnn.keras")
+        self.declare_parameter("scaler_pv_file", "scaler_pv_cnn.save")
+        self.declare_parameter("scaler_ang_file", "scaler_angles_cnn.save")
+        self.declare_parameter("excel_file", "PV_cp_cnn.xlsx")
 
         self.declare_parameter("angle_joint_order", [
             "left_hip_revolute_joint",

@@ -13,36 +13,17 @@
   <!-- simple geometry properties -->
   <xacro:property name="torso_width" value="0.5"/>   <!-- in meters -->
   <!-- repeated leg joint names -->
+  <xacro:property name="width" value="0.05"/>
   <xacro:property name="joint0" value="pelvis" /> <!-- hip base to torso; fixed! -->
   <xacro:property name="joint1" value="hip" />    <!-- fixed to thigh -->
   <xacro:property name="joint2" value="knee" />   <!-- thigh to shank -->
   <xacro:property name="joint3" value="ankle" />  <!-- shank to foot -->
+  <xacro:property name="origin_y_thigh" value="0.043454"/>
 
-  <!-- === Free Robot. No world link. No base joint === -->
-  <!-- <link name="base_link">
-    <inertial>
-      <origin xyz="0 0 0.5" rpy="0 0 0"/>
-      <mass value="1.0"/>
-      <inertia ixx="0.1041667" ixy="0" ixz="0"
-               iyy="0.0885417" iyz="0"
-               izz="0.0260417"/>
-    </inertial>
-
-    <visual>
-      <origin xyz="0 0 0.5" rpy="0 0 0"/>
-      <geometry><box size="0.25 0.5 1"/></geometry>
-      <material name="red"/>
-    </visual>
-    <collision>
-      <origin xyz="0 0 0.5" rpy="0 0 0"/>
-      <geometry><box size="0.25 0.5 1"/></geometry>
-    </collision>
-  </link>
-  <gazebo reference="base_link">
-    <pose>0 0 1.214 0 0 3.14159</pose>
-  </gazebo> -->
-
-
+  <!-- Foot sole contact -->
+  <xacro:property name="foot_size_y" value="0.10"/>  <!-- width (side-to-side) -->
+  <xacro:property name="foot_size_z" value="0.17"/>  <!-- length (forward) -->
+  <xacro:property name="sole_thick"  value="0.001"/>
   <!-- === Allowing X and Z axis only === -->
   <link name="base_link">
     <inertial>
@@ -87,7 +68,7 @@
     <visual><geometry><sphere radius="0.01"/></geometry></visual>
   </link>
   <joint name="base_z" type="prismatic">
-    <origin xyz="0 0 1.22" rpy="0 0 ${pi}"/>
+    <origin xyz="0 0 1.23" rpy="0 0 ${pi}"/>
     <parent link="world"/>
     <child link="slider_z"/>
     <axis xyz="0 0 1"/>
@@ -138,10 +119,12 @@
     </link>
 
 
-
+    <xacro:if value="${int(reflect) &lt; 0}">
+      <xacro:property name="origin_y_thigh" value="0.123454"/>
+    </xacro:if>
     <!-- hip joint: fixed hip base to thigh (link1) -->
     <joint name="${prefix}_${joint1}_revolute_joint" type="revolute">
-      <origin xyz="0.00012638 0.043454 -0.0003763" rpy="${pi / 2} ${pi / 2} ${pi}" />
+      <origin xyz="0.00012638 ${origin_y_thigh} -0.0003763" rpy="${pi / 2} ${pi / 2} ${pi}" />
       <parent link="${prefix}_${link0}" />
       <child link="${prefix}_${link1}" />
       <!-- <axis xyz="-0.0029081 -0.99996 0.0086592" /> -->
@@ -244,6 +227,44 @@
         </geometry>
       </collision>
     </link>
+
+    <!-- Extra joint + link for sole contact sensor -->
+    <joint name="${prefix}_foot_to_sole_sensor" type="fixed">
+      <origin xyz="0.015 0.05 0" rpy="0 ${pi/2} 0"/>
+      <parent link="${prefix}_${link3}"/>
+      <child link="${prefix}_sole_sensor"/>
+    </joint>
+
+    <link name="${prefix}_sole_sensor">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.001"/>
+        <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/></inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 ${pi/2} ${pi/2}"/>
+        <geometry>
+          <box size="${sole_thick} ${foot_size_y} ${foot_size_z}"/>
+        </geometry>
+        <material name="dark_gray"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 ${pi/2} ${pi/2}"/>
+        <geometry>
+          <box size="${sole_thick} ${foot_size_y} ${foot_size_z}"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <gazebo reference="${prefix}_sole_sensor">
+      <sensor name="${prefix}_sole_contact" type="contact">
+        <always_on>1</always_on>
+        <update_rate>200</update_rate>
+        <contact>
+          <collision>${prefix}_foot_fixed_joint_lump__${prefix}_sole_sensor_collision_1</collision>
+        </contact>
+      </sensor>
+    </gazebo>
+
   </xacro:macro>
 
   <!-- Legs actually created. -->
