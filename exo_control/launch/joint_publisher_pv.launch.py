@@ -9,7 +9,7 @@ def generate_launch_description():
     exo_description_pkg = FindPackageShare('exo_description')
     exo_control_pkg = FindPackageShare('exo_control')
     urdf_path = PathJoinSubstitution([exo_description_pkg, 'urdf', 'lleap_exo.urdf.xacro'])
-    controllers_config = PathJoinSubstitution([exo_control_pkg, 'config', 'ros2_controller.yaml'])
+    controllers_config = PathJoinSubstitution([exo_control_pkg, 'config', 'ros2_controller_march_6.yaml'])
     # Load robot description
     robot_description = ParameterValue(Command(['xacro ', urdf_path]), value_type=str)
 

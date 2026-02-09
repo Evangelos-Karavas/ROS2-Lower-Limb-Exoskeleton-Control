@@ -1,0 +1,47 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 1000
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+trajectory_controller:
+  ros__parameters:
+    joints:
+      - left_hip_revolute_joint
+      - left_knee_revolute_joint
+      - left_ankle_revolute_joint
+      - right_hip_revolute_joint
+      - right_knee_revolute_joint
+      - right_ankle_revolute_joint
+
+    command_interfaces: [position]
+    state_interfaces: [position]
+
+    update_rate: 500
+    action_monitor_rate: 100.0
+
+    interpolate_from_desired_state: true
+    allow_partial_joints_goal: false
+    allow_nonzero_velocity_at_trajectory_end: false
+
+    gains:
+      left_hip_revolute_joint: {p: 5000.0, i: 0.0, d: 100.0}
+      left_knee_revolute_joint: {p: 5000.0, i: 0.0, d: 100.0}
+      left_ankle_revolute_joint: {p: 500.0, i: 0.0, d: 10.0}
+      right_hip_revolute_joint: {p: 5000.0, i: 0.0, d: 100.0}
+      right_knee_revolute_joint: {p: 5000.0, i: 0.0, d: 100.0}
+      right_ankle_revolute_joint: {p: 500.0, i: 0.0, d: 10.0}
+
+    constraints:
+      stopped_velocity_tolerance: 0.01
+      goal_time: 0.5
+      left_hip_revolute_joint: {trajectory: 2.0, goal: 2.0}
+      left_knee_revolute_joint: {trajectory: 2.0, goal: 2.0}
+      left_ankle_revolute_joint: {trajectory: 2.0, goal: 2.0}
+      right_hip_revolute_joint: {trajectory: 2.0, goal: 2.0}
+      right_knee_revolute_joint: {trajectory: 2.0, goal: 2.0}
+      right_ankle_revolute_joint: {trajectory: 2.0, goal: 2.0}

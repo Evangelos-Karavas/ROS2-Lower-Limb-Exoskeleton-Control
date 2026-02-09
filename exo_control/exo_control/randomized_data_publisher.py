@@ -14,7 +14,7 @@ class JointPublisherFromExcel(Node):
     def __init__(self):
         super().__init__('joint_publisher_from_excel')
 
-        pub_rate = 0.4  # seconds between publishes
+        pub_rate = 0.2  # seconds between publishes
         self.joint_names = [
             'left_hip_revolute_joint',
             'right_hip_revolute_joint',
@@ -41,9 +41,9 @@ class JointPublisherFromExcel(Node):
             self.traj_index = 0
             return
         joint_positions = np.radians(self.joint_data[self.traj_index])
-        for i, joint in enumerate(self.joint_names):
-            if 'knee' in joint and joint_positions[i] >= 0.0:
-                joint_positions[i] = -joint_positions[i]
+        # for i, joint in enumerate(self.joint_names):
+        #     if 'knee' in joint and joint_positions[i] >= 0.0:
+        #         joint_positions[i] = -joint_positions[i]
 
         # publish trajectory message
         msg = JointTrajectory()
