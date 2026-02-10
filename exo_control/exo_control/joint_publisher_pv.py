@@ -8,8 +8,8 @@ from enum import Enum
 import numpy as np
 import pandas as pd
 import rclpy
-
 from rclpy.node import Node
+
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
 from sensor_msgs.msg import JointState
@@ -23,7 +23,7 @@ from tensorflow.keras.models import load_model
 
 
 # ============================================================
-#  Rezazadeh-style PV FSM (thigh angle + foot contact)
+#  Rezazadeh-style PV FSM (qh + foot contact)
 # ============================================================
 class PVState(Enum):
     S1_STANCE = 1
@@ -87,22 +87,17 @@ class PhaseVariableFSM:
 
         qdot = self._qh_dot(qh, t)
 
-        # transitions
         if self.state != PVState.S4_SWING and (not fc):
             self.state = PVState.S4_SWING
-
         elif self.state == PVState.S4_SWING and fc:
             self.reset_stride()
-
         elif self.state == PVState.S1_STANCE and fc and (qh <= self.qpo):
             self.state = PVState.S2_PUSH_OFF
-
         elif self.state == PVState.S2_PUSH_OFF and fc and (qdot > self.vel_eps):
             self.sm = self._s_desc(qh)
             self.qhm = qh
             self.state = PVState.S3_PRESWING
 
-        # compute s
         if self.state in (PVState.S1_STANCE, PVState.S2_PUSH_OFF):
             s = self._s_desc(qh)
         else:
@@ -115,91 +110,98 @@ class PhaseVariableFSM:
 
 
 # ============================================================
-#  MAIN NODE
+#  Next-tick PV NN publisher with teacher-forcing -> free-run
+#  - Input window in TRAINING ORDER: [pvL,pvR,Lhip,Lknee,Lankle,Rhip,Rknee,Rankle]
+#  - PV computed live from hip angle + foot contact FSM
+#  - Angles appended from joint_states for warmup ticks, then from predictions
+#  - Publishes 1 next-tick point each timer tick (stable)
 # ============================================================
-class PVExcelRecursivePublisher(Node):
+class JointPublisherPVNextTick(Node):
     def __init__(self):
-        super().__init__("joint_publisher_pv_excel_recursive")
+        super().__init__("joint_publisher_pv")
 
-        # ---------------- parameters ----------------
-        self.declare_parameter("window", 51)
-        self.declare_parameter("pub_timer", 0.6)   # 0.3s = 3 Hz publishing
-        self.declare_parameter("segment_len", 3)
+        # use_sim_time
+        if not self.has_parameter("use_sim_time"):
+            self.declare_parameter("use_sim_time", True)
 
-        self.declare_parameter("invert_knee_if_positive", True)
+        # QoS for joint_states: shallow queue + best effort for low latency
+        js_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            durability=DurabilityPolicy.VOLATILE,
+        )
 
-        self.declare_parameter("pv_joint_left", "left_hip_revolute_joint")
-        self.declare_parameter("pv_joint_right", "right_hip_revolute_joint")
-        self.declare_parameter("pv_flip_hip_sign", True)
+        # Publishers
+        self.trajectory_publisher_ = self.create_publisher(
+            JointTrajectory, "/trajectory_controller/joint_trajectory", 10
+        )
+        self.pv_publisher_ = self.create_publisher(Float32MultiArray, "/phase_variable", 10)
 
-        self.declare_parameter("fc_topic_left", "/left_sole/in_contact")
-        self.declare_parameter("fc_topic_right", "/right_sole/in_contact")
+        # Subscribers
+        self.joint_state_sub = self.create_subscription(
+            JointState, "/joint_states", self._on_joint_state, js_qos
+        )
 
-        # PV params (deg)
-        self.declare_parameter("pv_q0_deg", 34.0)
-        self.declare_parameter("pv_qmin_deg", 2.9)
-        self.declare_parameter("pv_c", 0.53)
-        self.declare_parameter("pv_qpo_deg", 10.0)
-        self.declare_parameter("pv_vel_eps_deg_s", 5.0)
+        # Foot contact
+        self.fc_topic_left = "/left_sole/in_contact"
+        self.fc_topic_right = "/right_sole/in_contact"
+        self.fcL = False
+        self.fcR = False
+        self.sub_fcL = self.create_subscription(Bool, self.fc_topic_left, self._on_fcL, 10)
+        self.sub_fcR = self.create_subscription(Bool, self.fc_topic_right, self._on_fcR, 10)
 
-        # PV rollout progression for preview points
-        self.declare_parameter("assumed_stride_period", 1.6)  # seconds per stride
+        # ======== CONFIG (edit here) ========
+        self.W = 51
+        self.pub_timer = 0.03  # seconds
+
+        # Warmup: how many ticks we append measured angles before free-run
+        self.measured_angle_warmup_ticks = 50  # set 0 for immediate free-run
+
+        # Controller joint order (publishing)
+        self.joint_names_ctrl = [
+            "left_hip_revolute_joint",
+            "right_hip_revolute_joint",
+            "left_knee_revolute_joint",
+            "right_knee_revolute_joint",
+            "left_ankle_revolute_joint",
+            "right_ankle_revolute_joint",
+        ]
+
+        # TRAINING ORDER for the 6 angles:
+        # [Lhip, Lknee, Lankle, Rhip, Rknee, Rankle]
+        self.angle_names_train = [
+            "left_hip_revolute_joint",
+            "left_knee_revolute_joint",
+            "left_ankle_revolute_joint",
+            "right_hip_revolute_joint",
+            "right_knee_revolute_joint",
+            "right_ankle_revolute_joint",
+        ]
+
+        # PV source joints for FSM (qh)
+        self.pv_joint_left = "left_hip_revolute_joint"
+        self.pv_joint_right = "right_hip_revolute_joint"
+        self.pv_flip_hip_sign = False
+
+        # Knee inversion like your NN node (applied in controller order)
+        self.invert_knee_if_positive = True
+
+        # PV FSM params (deg)
+        q0 = 34.0
+        qmin = 2.9
+        c = 0.53
+        qpo = 10.0
+        vel_eps = 5.0
 
         # Files
-        self.declare_parameter("model_file", "PV_rolling_next_tick_cnn.keras")
-        self.declare_parameter("scaler_pv_file", "scaler_pv_cnn.save")
-        self.declare_parameter("scaler_ang_file", "scaler_angles_cnn.save")
-        self.declare_parameter("excel_file", "PV_cp_cnn.xlsx")
+        model_file = "PV_rolling_next_tick_lstm.keras"
+        scaler_pv_file = "scaler_pv_lstm.save"
+        scaler_ang_file = "scaler_angles_lstm.save"
+        excel_file = "PV_cp_cnn.xlsx"  # [pvL,pvR,6angles_in_training_order]
+        # ================================
 
-        self.declare_parameter("angle_joint_order", [
-            "left_hip_revolute_joint",
-            "left_knee_revolute_joint",
-            "left_ankle_revolute_joint",
-            "right_hip_revolute_joint",
-            "right_knee_revolute_joint",
-            "right_ankle_revolute_joint",
-        ])
-
-        self.declare_parameter("traj_joints", [
-            "left_hip_revolute_joint",
-            "right_hip_revolute_joint",
-            "left_knee_revolute_joint",
-            "right_knee_revolute_joint",
-            "left_ankle_revolute_joint",
-            "right_ankle_revolute_joint",
-        ])
-
-        # ---------------- read params ----------------
-        self.W = int(self.get_parameter("window").value)
-        self.pub_timer = float(self.get_parameter("pub_timer").value)
-        self.segment_len = int(self.get_parameter("segment_len").value)
-
-        self.invert_knee_if_positive = bool(self.get_parameter("invert_knee_if_positive").value)
-
-        self.pv_joint_left = str(self.get_parameter("pv_joint_left").value)
-        self.pv_joint_right = str(self.get_parameter("pv_joint_right").value)
-        self.pv_flip_hip_sign = bool(self.get_parameter("pv_flip_hip_sign").value)
-
-        self.fc_topic_left = str(self.get_parameter("fc_topic_left").value)
-        self.fc_topic_right = str(self.get_parameter("fc_topic_right").value)
-
-        q0 = float(self.get_parameter("pv_q0_deg").value)
-        qmin = float(self.get_parameter("pv_qmin_deg").value)
-        c = float(self.get_parameter("pv_c").value)
-        qpo = float(self.get_parameter("pv_qpo_deg").value)
-        vel_eps = float(self.get_parameter("pv_vel_eps_deg_s").value)
-
-        self.assumed_stride_period = float(self.get_parameter("assumed_stride_period").value)
-
-        model_file = str(self.get_parameter("model_file").value)
-        scaler_pv_file = str(self.get_parameter("scaler_pv_file").value)
-        scaler_ang_file = str(self.get_parameter("scaler_ang_file").value)
-        excel_file = str(self.get_parameter("excel_file").value)
-
-        self.angle_joint_order = list(self.get_parameter("angle_joint_order").value)
-        self.traj_joints = list(self.get_parameter("traj_joints").value)
-
-        # ---------------- load model/scalers/excel ----------------
+        # Load model + scalers + seed window
         pkg_dir = get_package_share_directory("exo_control")
         self.model_path = os.path.join(pkg_dir, "neural_network_parameters/models", model_file)
         self.scaler_pv_path = os.path.join(pkg_dir, "neural_network_parameters/scaler", scaler_pv_file)
@@ -213,7 +215,7 @@ class PVExcelRecursivePublisher(Node):
         self.model = load_model(self.model_path)
         self.scaler_pv = joblib.load(self.scaler_pv_path)
         self.scaler_ang = joblib.load(self.scaler_ang_path)
-        self.get_logger().info("Loaded PV model + scalers.")
+        self.get_logger().info("Loaded PV next-tick model + scalers.")
 
         df = pd.read_excel(self.excel_path)
         raw = df.values.astype(np.float32)
@@ -222,107 +224,84 @@ class PVExcelRecursivePublisher(Node):
         if raw.shape[0] < self.W:
             raise RuntimeError(f"Excel must have at least {self.W} rows, got {raw.shape[0]}")
 
-        self.rolling_unscaled = raw[:self.W].copy()
-        self.last_pv = (float(self.rolling_unscaled[-1, 0]), float(self.rolling_unscaled[-1, 1]))
+        # Rolling window UNSCALED: degrees for angles, PV in [0..1]
+        # shape (51,8) = [pvL,pvR,6 angles in training order]
+        self.window_unscaled = raw[: self.W].copy()
 
-        # ---------------- PV engines + FC ----------------
+        # PV engines
         self.pv_fsm_L = PhaseVariableFSM(q0_deg=q0, qmin_deg=qmin, c=c, qpo_deg=qpo, vel_eps_deg_s=vel_eps)
         self.pv_fsm_R = PhaseVariableFSM(q0_deg=q0, qmin_deg=qmin, c=c, qpo_deg=qpo, vel_eps_deg_s=vel_eps)
 
-        self.fcL = False
-        self.fcR = False
+        # Latest state initialized from excel
+        self.last_pv = (float(self.window_unscaled[-1, 0]), float(self.window_unscaled[-1, 1]))
+        self.last_angles_train_deg = self.window_unscaled[-1, 2:].astype(np.float32)
 
-        # ---------------- ROS IO ----------------
-        js_qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=1,
-            durability=DurabilityPolicy.VOLATILE,
-        )
+        # Teacher forcing state
+        self.tick_count = 0
+        self.last_predicted_angles_train_deg = self.last_angles_train_deg.copy()
 
-        self.sub_js = self.create_subscription(JointState, "/joint_states", self._on_joint_state, js_qos)
-        self.sub_fcL = self.create_subscription(Bool, self.fc_topic_left, self._on_fcL, 10)
-        self.sub_fcR = self.create_subscription(Bool, self.fc_topic_right, self._on_fcR, 10)
-
-        self.pub_traj = self.create_publisher(JointTrajectory, "/trajectory_controller/joint_trajectory", 10)
-        self.pub_pv = self.create_publisher(Float32MultiArray, "/phase_variable", 10)
-
-        # Publish every pub_timer (0.05 sec)
+        # Timer
         self.timer = self.create_timer(self.pub_timer, self._timer_cb)
-
         self.get_logger().info(
-            f"READY. dt={self.pub_timer}s, segment_len={self.segment_len}, assumed_stride_period={self.assumed_stride_period}s"
+            f"READY next-tick. dt={self.pub_timer}s, W={self.W}, warmup_ticks={self.measured_angle_warmup_ticks}"
         )
 
-    # ---------------- scaling helpers ----------------
-    def _scale_features(self, unscaled_Wx8: np.ndarray) -> np.ndarray:
-        pv_un = unscaled_Wx8[:, :2].astype(np.float32)
-        ang_un = unscaled_Wx8[:, 2:].astype(np.float32)
-        pv_sc = self.scaler_pv.transform(pv_un)
-        ang_sc = self.scaler_ang.transform(ang_un)
-        X = np.concatenate([pv_sc, ang_sc], axis=1).astype(np.float32)
-        return X.reshape(1, self.W, 8)
-
-    def _unscale_angles(self, y_scaled_6: np.ndarray) -> np.ndarray:
-        y_scaled_6 = y_scaled_6.reshape(1, -1).astype(np.float32)
-        return self.scaler_ang.inverse_transform(y_scaled_6)[0].astype(np.float32)
-
-    # ---------------- conventions ----------------
-    def _flip_knee_signs_inplace_deg(self, a: np.ndarray):
-        if not self.invert_knee_if_positive:
-            return
-        for ki in [1, 4]:
-            if a[ki] >= 0.0:
-                a[ki] = -a[ki]
-
-    # ---------------- model next step ----------------
-    def _predict_next_step_scaled(self, X_1xWx8: np.ndarray) -> np.ndarray:
-        y = self.model.predict(X_1xWx8, verbose=0)
-        y = np.array(y)
-        if y.ndim == 2 and y.shape == (1, 6):
-            return y[0].astype(np.float32)
-        if y.ndim == 1 and y.shape == (6,):
-            return y.astype(np.float32)
-        raise RuntimeError(f"Unexpected PV model output shape: {y.shape}")
-
-    # ---------------- publishing ----------------
-    def _publish_segment_deg(self, seg_deg: np.ndarray):
-        msg = JointTrajectory()
-        msg.joint_names = self.traj_joints
-
-        for i in range(seg_deg.shape[0]):
-            a = seg_deg[i].copy()
-            self._flip_knee_signs_inplace_deg(a)
-
-            m = {j: float(np.radians(a[k])) for k, j in enumerate(self.angle_joint_order)}
-
-            pt = JointTrajectoryPoint()
-            pt.positions = [m[j] for j in self.traj_joints]
-            pt.time_from_start = Duration(sec=0, nanosec=int((i + 1) * self.pub_timer * 1e9))
-            msg.points.append(pt)
-
-        self.pub_traj.publish(msg)
-
-    # ---------------- FC callbacks ----------------
+    # ----------------------------
+    # Foot contact callbacks
+    # ----------------------------
     def _on_fcL(self, msg: Bool):
         self.fcL = bool(msg.data)
 
     def _on_fcR(self, msg: Bool):
         self.fcR = bool(msg.data)
 
-    # ---------------- JointState callback: LIVE PV ----------------
+    # ----------------------------
+    # Scaling helpers (match training)
+    # ----------------------------
+    def _scale_window(self, win_unscaled_Wx8: np.ndarray) -> np.ndarray:
+        pv_un = win_unscaled_Wx8[:, :2].astype(np.float32)
+        ang_un = win_unscaled_Wx8[:, 2:].astype(np.float32)
+        pv_sc = self.scaler_pv.transform(pv_un)
+        ang_sc = self.scaler_ang.transform(ang_un)
+        X = np.concatenate([pv_sc, ang_sc], axis=1).astype(np.float32)
+        return X.reshape(1, self.W, 8)
+
+    def _predict_next_angles_deg_train_order(self) -> np.ndarray:
+        X = self._scale_window(self.window_unscaled)
+        y_scaled = np.array(self.model.predict(X, verbose=0))
+
+        if y_scaled.ndim == 2 and y_scaled.shape == (1, 6):
+            y_scaled = y_scaled[0]
+        elif y_scaled.ndim == 1 and y_scaled.shape == (6,):
+            pass
+        else:
+            raise RuntimeError(f"Unexpected model output shape: {y_scaled.shape}")
+
+        y_deg = self.scaler_ang.inverse_transform(y_scaled.reshape(1, -1))[0].astype(np.float32)
+        return y_deg
+
+    # ----------------------------
+    # Order mapping: training -> controller
+    # ----------------------------
+    @staticmethod
+    def _train_order_deg_to_ctrl_order_deg(a_train6: np.ndarray) -> np.ndarray:
+        # [Lhip, Lknee, Lankle, Rhip, Rknee, Rankle] -> [Lhip, Rhip, Lknee, Rknee, Lankle, Rankle]
+        Lhip, Lknee, Lankle, Rhip, Rknee, Rankle = a_train6.tolist()
+        return np.array([Lhip, Rhip, Lknee, Rknee, Lankle, Rankle], dtype=np.float32)
+
+    # ----------------------------
+    # JointState: compute PV + measured angles
+    # ----------------------------
     def _on_joint_state(self, msg: JointState):
         name_to_i = {n: i for i, n in enumerate(msg.name)}
+
         if self.pv_joint_left not in name_to_i or self.pv_joint_right not in name_to_i:
             return
 
         t_now = self.get_clock().now().nanoseconds * 1e-9
 
-        qL_rad = float(msg.position[name_to_i[self.pv_joint_left]])
-        qR_rad = float(msg.position[name_to_i[self.pv_joint_right]])
-
-        qL_deg = float(np.degrees(qL_rad))
-        qR_deg = float(np.degrees(qR_rad))
+        qL_deg = float(np.degrees(float(msg.position[name_to_i[self.pv_joint_left]])))
+        qR_deg = float(np.degrees(float(msg.position[name_to_i[self.pv_joint_right]])))
 
         if self.pv_flip_hip_sign:
             qL_deg = -qL_deg
@@ -330,64 +309,82 @@ class PVExcelRecursivePublisher(Node):
 
         pvL = self.pv_fsm_L.update(qL_deg, self.fcL, t_now)
         pvR = self.pv_fsm_R.update(qR_deg, self.fcR, t_now)
-
         self.last_pv = (pvL, pvR)
 
-    # ---------------- Timer: publish PV + rollout ----------------
+        # measured angles in TRAINING ORDER
+        try:
+            a_train = np.array(
+                [np.degrees(float(msg.position[name_to_i[j]])) for j in self.angle_names_train],
+                dtype=np.float32,
+            )
+        except KeyError:
+            return
+
+        self.last_angles_train_deg = a_train
+
+    # ----------------------------
+    # Timer: teacher forcing -> free-run + next-tick publish
+    # ----------------------------
     def _timer_cb(self):
-        # publish current PV every tick
-        pvL_now, pvR_now = self.last_pv
+        pvL, pvR = self.last_pv
+
+        # publish PV (optional)
         pv_msg = Float32MultiArray()
-        pv_msg.data = [float(pvL_now), float(pvR_now)]
-        self.pub_pv.publish(pv_msg)
+        pv_msg.data = [float(pvL), float(pvR)]
+        self.pv_publisher_.publish(pv_msg)
 
-        # rollout segment with PV progressing forward
-        seg_deg = np.zeros((self.segment_len, 6), dtype=np.float32)
+        # 1) shift window
+        self.window_unscaled[:-1] = self.window_unscaled[1:]
 
-        # PV increment per step (preview progression)
-        dp = self.pub_timer / max(1e-3, self.assumed_stride_period)
+        # 2) choose angles for the new last row
+        if self.tick_count < self.measured_angle_warmup_ticks:
+            angles_for_last_row = self.last_angles_train_deg
+        else:
+            angles_for_last_row = self.last_predicted_angles_train_deg
 
-        pvL = pvL_now
-        pvR = pvR_now
+        # 3) append last row in TRAINING INPUT ORDER
+        self.window_unscaled[-1, 0] = float(pvL)
+        self.window_unscaled[-1, 1] = float(pvR)
+        self.window_unscaled[-1, 2:] = angles_for_last_row.astype(np.float32)
 
-        for k in range(self.segment_len):
-            # Write PV into the "current" last row so X uses up-to-date PV
-            self.rolling_unscaled[-1, 0] = float(pvL)
-            self.rolling_unscaled[-1, 1] = float(pvR)
+        # 4) predict next-tick angles (TRAINING ORDER)
+        next_angles_train_deg = self._predict_next_angles_deg_train_order()
+        self.last_predicted_angles_train_deg = next_angles_train_deg.copy()
 
-            Xk = self._scale_features(self.rolling_unscaled)
-            y_scaled = self._predict_next_step_scaled(Xk)
-            y_deg = self._unscale_angles(y_scaled)
+        # 5) map to controller order, knee inversion, publish 1 point
+        next_angles_ctrl_deg = self._train_order_deg_to_ctrl_order_deg(next_angles_train_deg)
+        next_angles_ctrl_deg[2] = -abs(next_angles_ctrl_deg[2])
+        next_angles_ctrl_deg[3] = -abs(next_angles_ctrl_deg[3])
 
-            self._flip_knee_signs_inplace_deg(y_deg)
-            seg_deg[k] = y_deg
+        msg = JointTrajectory()
+        msg.joint_names = self.joint_names_ctrl
 
-            # advance PV for next predicted point (monotonic, wrap at 1)
-            pvL = (pvL + dp) % 1.0
-            pvR = (pvR + dp) % 1.0
+        pt = JointTrajectoryPoint()
+        pt.positions = np.radians(next_angles_ctrl_deg).tolist()
+        pt.time_from_start = Duration(sec=0, nanosec=int(self.pub_timer * 1e9))
+        msg.points.append(pt)
 
-            # shift rolling window and append new row
-            new_row = np.concatenate([[pvL, pvR], y_deg]).astype(np.float32)
-            self.rolling_unscaled[:-1] = self.rolling_unscaled[1:]
-            self.rolling_unscaled[-1] = new_row
+        self.trajectory_publisher_.publish(msg)
 
-        self._publish_segment_deg(seg_deg)
+        self.tick_count += 1
 
-    # ---------------- safety: send joints to zero ----------------
+    # ----------------------------
+    # Safety
+    # ----------------------------
     def send_joints_to_zero(self, duration=2.0):
         msg = JointTrajectory()
-        msg.joint_names = self.traj_joints
+        msg.joint_names = self.joint_names_ctrl
         pt = JointTrajectoryPoint()
-        pt.positions = [0.0] * len(self.traj_joints)
+        pt.positions = [0.0] * len(self.joint_names_ctrl)
         pt.time_from_start = Duration(sec=int(duration))
         msg.points.append(pt)
-        self.pub_traj.publish(msg)
-        self.get_logger().info("Sent joints to zero.")
+        self.trajectory_publisher_.publish(msg)
+        self.get_logger().info("Sent all joints to zero.")
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = PVExcelRecursivePublisher()
+    node = JointPublisherPVNextTick()
 
     def shutdown_handler(signum, frame):
         node.get_logger().info("CTRL+C: Shutting Down...")

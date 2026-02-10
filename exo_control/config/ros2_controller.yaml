@@ -37,11 +37,11 @@ trajectory_controller:
       right_ankle_revolute_joint: {p: 50.0, i: 0.0, d: 2.5}
 
     constraints:
-      stopped_velocity_tolerance: 0.05
-      goal_time: 0.0
-      left_hip_revolute_joint: {trajectory: 0.05, goal: 0.02}
-      left_knee_revolute_joint: {trajectory: 0.05, goal: 0.02}
-      left_ankle_revolute_joint: {trajectory: 0.05, goal: 0.02}
-      right_hip_revolute_joint: {trajectory: 0.05, goal: 0.02}
-      right_knee_revolute_joint: {trajectory: 0.05, goal: 0.02}
-      right_ankle_revolute_joint: {trajectory: 0.05, goal: 0.02}
+      stopped_velocity_tolerance: 0.01
+      goal_time: 0.5
+      left_hip_revolute_joint: {trajectory: 2.0, goal: 2.0}
+      left_knee_revolute_joint: {trajectory: 2.0, goal: 2.0}
+      left_ankle_revolute_joint: {trajectory: 2.0, goal: 2.0}
+      right_hip_revolute_joint: {trajectory: 2.0, goal: 2.0}
+      right_knee_revolute_joint: {trajectory: 2.0, goal: 2.0}
+      right_ankle_revolute_joint: {trajectory: 2.0, goal: 2.0}

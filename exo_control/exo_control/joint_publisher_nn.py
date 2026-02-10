@@ -15,13 +15,8 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 import subprocess
 
 class JointPublisherFromModel(Node):
-    """
-    Streams LSTM/CNN joint positions to ros2_control by publishing
-    multi-point JointTrajectory segments (sliding horizon).
-    """
-
     def __init__(self):
-        super().__init__('joint_publisher_from_nn_model')
+        super().__init__('joint_publisher_nn')
 
         if not self.has_parameter('use_sim_time'): self.declare_parameter('use_sim_time', True)
         # QoS for joint_states: shallow queue + best effort for low latency

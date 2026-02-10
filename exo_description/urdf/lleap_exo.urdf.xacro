@@ -13,7 +13,6 @@
   <!-- simple geometry properties -->
   <xacro:property name="torso_width" value="0.5"/>   <!-- in meters -->
   <!-- repeated leg joint names -->
-  <xacro:property name="width" value="0.05"/>
   <xacro:property name="joint0" value="pelvis" /> <!-- hip base to torso; fixed! -->
   <xacro:property name="joint1" value="hip" />    <!-- fixed to thigh -->
   <xacro:property name="joint2" value="knee" />   <!-- thigh to shank -->
@@ -80,7 +79,7 @@
     <parent link="slider_z"/>
     <child link="slider_x"/>
     <axis xyz="1 0 0"/>
-    <limit lower="-5.0" upper="5.0" effort="500" velocity="1.0"/>
+    <limit lower="-5.0" upper="10.0" effort="500" velocity="1.0"/>
     <dynamics damping="5.0" friction="0.5"/>
   </joint>
   <joint name="base_to_body" type="fixed">
@@ -167,7 +166,7 @@
       <child link="${prefix}_${link2}" />
       <axis xyz="0 0 1" />
       <!-- Positional joint limits partially based on Tamar's msts (lower lim here). -->
-      <limit lower="-10.0" upper="10.0" effort="250" velocity="1.308" />
+      <limit lower="-10.0" upper="0.0" effort="250" velocity="1.308" />
       <dynamics damping="0.4" friction="1.0"/>
     </joint>
 
@@ -245,7 +244,7 @@
         <geometry>
           <box size="${sole_thick} ${foot_size_y} ${foot_size_z}"/>
         </geometry>
-        <material name="dark_gray"/>
+        <material name="orange"/>
       </visual>
       <collision>
         <origin xyz="0 0 0" rpy="0 ${pi/2} ${pi/2}"/>
