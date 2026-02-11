@@ -1,5 +1,7 @@
 # 🦿 Exoskeleton ROS2 Project
 
+Special thanks to Max Lewter [LLEAP](https://github.com/MaxLewter16/LLEAP)
+
 This project implements a **ROS-2 Humble based control framework for a powered hip-knee–ankle exoskeleton** using both **phase-variable control** and **neural network–based gait prediction**.  
 It integrates **simulation**, **control**, and **visualization** in Gazebo, MoveIt, and RViz for research on human gait and robotic prosthesis control.
 
