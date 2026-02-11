@@ -48,7 +48,12 @@ def generate_launch_description():
     spawn_entity = Node(
         package='ros_gz_sim',
         executable='create',
-        arguments=['-name', 'exosuit', '-topic', 'robot_description'],
+        arguments=[
+            '-name', 'exosuit',
+            '-topic', 'robot_description',
+            '-x', '0.0', '-y', '0.0', '-z', '1.4',
+            '-R', '0.0', '-P', '0.0', '-Y', '0.0',
+        ],
         output='screen'
     )
 
@@ -90,7 +95,26 @@ def generate_launch_description():
         period=3.0,
         actions=[bridge_contacts]
     )
-
+    bridge_imu = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        output='screen',
+        arguments=[
+            '/world/empty/model/exosuit/link/slider_x/sensor/base_link_imu/imu'
+            '@sensor_msgs/msg/Imu[gz.msgs.IMU',
+        ],
+        remappings=[
+            (
+                '/world/empty/model/exosuit/link/slider_x/sensor/base_link_imu/imu',  #/world/empty/model/exosuit/link/base_link/sensor/base_link_imu/imu
+                '/imu/data'
+            ),
+        ],
+        parameters=[{'use_sim_time': use_sim_time}],
+    )
+    bridge_imu_after_spawn = TimerAction(
+        period=3.0,
+        actions=[bridge_imu]
+    )
     foot_contact_bool = Node(
         package='exo_control',
         executable='foot_contact_bool',
@@ -117,5 +141,6 @@ def generate_launch_description():
         gz_sim,
         spawn_entity,
         bridge_after_spawn,
+        bridge_imu_after_spawn,
         contacts_bool_after_bridge
     ])

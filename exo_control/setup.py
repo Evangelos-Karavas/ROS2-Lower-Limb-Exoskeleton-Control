@@ -49,12 +49,9 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "cp_joint_publisher = exo_control.cp_joint_publisher:main",
+            "data_publisher = exo_control.data_publisher:main",
             "joint_publisher = exo_control.joint_publisher_nn:main",
             "joint_publisher_pv = exo_control.joint_publisher_pv:main",
-            "data_publisher = exo_control.data_publisher:main",
-            "randomized_data_publisher = exo_control.randomized_data_publisher:main",
-            "joint_publisher_kinematics_kinetics = exo_control.joint_publisher_kinematics_kinetics:main",
             "foot_contact_bool = exo_control.foot_contact_bool:main",
         ],
     },

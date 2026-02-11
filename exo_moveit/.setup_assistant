@@ -5,8 +5,8 @@ moveit_setup_assistant_config:
   srdf:
     relative_path: config/lleap_exo.srdf
   package_settings:
-    author_name: Kyle Quinlan
-    author_email: kylequinlan09@gmail.com
+    author_name: Evangelos Karavas
+    author_email: vaggeliskaravas@gmail.com
     generated_timestamp: 1676608685
   control_xacro:
     command:

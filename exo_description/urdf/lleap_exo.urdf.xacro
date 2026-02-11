@@ -5,6 +5,8 @@
   <!-- Grab the joint limits. -->
   <xacro:include filename="$(find exo_description)/urdf/lleap_exo_joint_limits.xacro" />
   <xacro:include filename="$(find exo_description)/urdf/exo_material_colors.xacro"/>
+  <xacro:include filename="$(find exo_description)/urdf/exo_gazebo_extentions.xacro"/>
+  <xacro:include filename="$(find exo_description)/urdf/exo_ros2_control.xacro"/>
   <!-- link names; 1-3 map to .STL filenames -->
   <xacro:property name="link0" value="hip_base" />
   <xacro:property name="link1" value="thigh" />
@@ -67,7 +69,7 @@
     <visual><geometry><sphere radius="0.01"/></geometry></visual>
   </link>
   <joint name="base_z" type="prismatic">
-    <origin xyz="0 0 1.23" rpy="0 0 ${pi}"/>
+    <origin xyz="0 0 0" rpy="0 0 ${pi}"/>
     <parent link="world"/>
     <child link="slider_z"/>
     <axis xyz="0 0 1"/>
@@ -116,25 +118,39 @@
         </geometry>
       </collision>
     </link>
-
+    <!-- Hip abduction - adduction -->
+    <link name="${prefix}_hip_roll_link">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.001"/>
+        <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+      </inertial>
+    </link>
 
     <xacro:if value="${int(reflect) &lt; 0}">
       <xacro:property name="origin_y_thigh" value="0.123454"/>
     </xacro:if>
     <!-- hip joint: fixed hip base to thigh (link1) -->
-    <joint name="${prefix}_${joint1}_revolute_joint" type="revolute">
+    <joint name="${prefix}_hip_roll_revolute_joint" type="revolute">
+      <!-- keep the SAME origin + rpy as your old hip joint -->
       <origin xyz="0.00012638 ${origin_y_thigh} -0.0003763" rpy="${pi / 2} ${pi / 2} ${pi}" />
       <parent link="${prefix}_${link0}" />
-      <child link="${prefix}_${link1}" />
-      <!-- <axis xyz="-0.0029081 -0.99996 0.0086592" /> -->
-      <axis xyz="0 0 1" />
-      <!-- Positional joint limits partially based on joint calculations. -->
-      <limit lower="-10.0" upper="10.0"  effort="700" velocity="5" />
-      <dynamics damping="0.3" friction="0.1"/>
+      <child link="${prefix}_hip_roll_link" />
+      <!-- roll axis (in this joint frame) -->
+      <axis xyz="1 0 0" />
+      <limit lower="-0.6" upper="0.6" effort="250" velocity="2.0"/>
+      <dynamics damping="0.6" friction="0.2"/>
     </joint>
 
-    <!-- link1 should be the thigh (joint1 to joint2).
-          In our current STL model, contains the parts of the hip and knee joint visuals. -->
+    <joint name="${prefix}_${joint1}_revolute_joint" type="revolute">
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <parent link="${prefix}_hip_roll_link" />
+      <child link="${prefix}_${link1}" />
+      <axis xyz="0 0 1" />
+      <limit lower="-1.5" upper="1.5" effort="700" velocity="5" />
+      <dynamics damping="0.3" friction="0.1"/>
+    </joint>
+    <!-- link1 should be the thigh (joint1 to joint2). In our current STL model, contains the parts of the hip and knee joint visuals. -->
     <link name="${prefix}_${link1}">
       <inertial>
         <origin xyz="-0.404990833485201 0.00723950792302919 -0.0848264671155734" 
@@ -143,7 +159,6 @@
         <inertia ixx="0.00167557501769417" ixy="-8.47541360240001E-06" ixz="-0.00126944670009916" iyy="0.00777922506609577" iyz="-2.94088009595002E-06" izz="0.00736726690967362" />
       </inertial>
       <visual>
-        <!-- y part of rpy determined by measuring angles in screenshot -->
         <origin xyz="0 0 0" rpy="${pi / 2} 0 ${-(180 - 12) * pi / 180}" />
         <geometry>
           <mesh filename="file://$(find exo_description)/meshes/${link1}.STL"/>
@@ -195,14 +210,30 @@
       </collision>
     </link>
 
-    <!-- ankle joint: shank (link2) to foot ('link3') -->
-    <joint name="${prefix}_${joint3}_revolute_joint" type="revolute">
+    <link name="${prefix}_ankle_roll_link">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.001"/>
+        <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+      </inertial>
+    </link>
+
+    <joint name="${prefix}_ankle_roll_revolute_joint" type="revolute">
       <origin xyz="${0.475 + 0.075} 0.003 -0.03" rpy="0 0 0" />
       <parent link="${prefix}_${link2}" />
+      <child link="${prefix}_ankle_roll_link" />
+      <axis xyz="1 0 0" />
+      <limit lower="-0.5" upper="0.5" effort="200" velocity="2.0"/>
+      <dynamics damping="0.8" friction="0.3"/>
+    </joint>
+
+    <!-- ankle joint: shank (link2) to foot ('link3') -->
+    <joint name="${prefix}_${joint3}_revolute_joint" type="revolute">
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <parent link="${prefix}_ankle_roll_link" />
       <child link="${prefix}_${link3}" />
       <axis xyz="0 0 1" />
-      <!-- Positional joint limits NOT based on Tamar's msts, but normal ranges instead. -->
-      <limit lower="-10.0" upper="10.0"  effort="250" velocity="1.308"/>
+      <limit lower="-1.0" upper="1.0" effort="250" velocity="1.308"/>
       <dynamics damping="0.7" friction="0.5"/>
     </joint>
 
@@ -254,78 +285,12 @@
       </collision>
     </link>
 
-    <gazebo reference="${prefix}_sole_sensor">
-      <sensor name="${prefix}_sole_contact" type="contact">
-        <always_on>1</always_on>
-        <update_rate>200</update_rate>
-        <contact>
-          <collision>${prefix}_foot_fixed_joint_lump__${prefix}_sole_sensor_collision_1</collision>
-        </contact>
-      </sensor>
-    </gazebo>
-
   </xacro:macro>
 
   <!-- Legs actually created. -->
   <xacro:leg prefix="right" reflect="1" />
   <xacro:leg prefix="left" reflect="-1.75" />
-  
-  <ros2_control name="exosuit" type="system">
-    <hardware>
-      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
-    </hardware>
-
-    <joint name="left_hip_revolute_joint">
-      <command_interface name="position"/>
-      <!-- <command_interface name="effort"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="left_knee_revolute_joint">
-      <command_interface name="position"/>
-      <!-- <command_interface name="effort"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="left_ankle_revolute_joint">
-      <command_interface name="position"/>
-      <!-- <command_interface name="effort"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="right_hip_revolute_joint">
-      <command_interface name="position"/>
-      <!-- <command_interface name="effort"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="right_knee_revolute_joint">
-      <command_interface name="position"/>
-      <!-- <command_interface name="effort"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-    <joint name="right_ankle_revolute_joint">
-      <command_interface name="position"/>
-      <!-- <command_interface name="effort"/> -->
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-      <state_interface name="effort"/>
-    </joint>
-  </ros2_control>
- 
-  
-   <gazebo>  <!-- Gazebo - Ros plugin for (exo_control) controller package to work-->
-    <plugin filename="libign_ros2_control-system.so" name="ign_ros2_control::IgnitionROS2ControlPlugin">
-      <robot_param>robot_description</robot_param>
-      <robot_param_node>robot_state_publisher</robot_param_node>
-      <parameters>$(find exo_control)/config/ros2_controller.yaml</parameters>
-    </plugin>
-  </gazebo>
-
+  <!-- Gazebo sensors and ros2_control plugin-->
+  <xacro:exo_gazebo_extensions/>
+  <xacro:exo_ros2_control/>
 </robot>

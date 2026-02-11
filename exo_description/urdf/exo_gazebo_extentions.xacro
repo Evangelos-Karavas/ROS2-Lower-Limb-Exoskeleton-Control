@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- A macro that emits all Gazebo-specific tags -->
+  <xacro:macro name="exo_gazebo_extensions">
+
+    <!-- IMU plugin -->
+    <gazebo reference="slider_x">
+      <sensor name="base_link_imu" type="imu">
+        <always_on>true</always_on>
+        <update_rate>100</update_rate>
+        <imu>
+          <angular_velocity>
+            <x><noise type="gaussian"><mean>0.0</mean><stddev>2e-4</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0.0</mean><stddev>2e-4</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0.0</mean><stddev>2e-4</stddev></noise></z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x><noise type="gaussian"><mean>0.0</mean><stddev>1.7e-2</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0.0</mean><stddev>1.7e-2</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0.0</mean><stddev>1.7e-2</stddev></noise></z>
+          </linear_acceleration>
+        </imu>
+        <plugin filename="libignition-gazebo-imu-system.so" name="ignition::gazebo::systems::Imu">
+          <ros>
+            <namespace>imu</namespace>
+            <remapping>~/out:=data</remapping>
+          </ros>
+          <initial_orientation_as_reference>false</initial_orientation_as_reference>
+        </plugin>
+      </sensor>
+    </gazebo>
+
+    <!-- contact sensors for feet -->
+    <gazebo reference="left_sole_sensor">
+      <sensor name="left_sole_contact" type="contact">
+        <always_on>1</always_on>
+        <update_rate>200</update_rate>
+        <contact>
+          <collision>left_foot_fixed_joint_lump__left_sole_sensor_collision_1</collision>
+        </contact>
+      </sensor>
+    </gazebo>
+
+    <gazebo reference="right_sole_sensor">
+      <sensor name="right_sole_contact" type="contact">
+        <always_on>1</always_on>
+        <update_rate>200</update_rate>
+        <contact>
+          <collision>right_foot_fixed_joint_lump__right_sole_sensor_collision_1</collision>
+        </contact>
+      </sensor>
+    </gazebo>
+
+    <!--gz_ros2_control plugin -->
+    <gazebo>
+      <plugin filename="libign_ros2_control-system.so" name="ign_ros2_control::IgnitionROS2ControlPlugin">
+        <robot_param>robot_description</robot_param>
+        <robot_param_node>robot_state_publisher</robot_param_node>
+        <parameters>$(find exo_control)/config/ros2_controller.yaml</parameters>
+      </plugin>
+    </gazebo>
+
+  </xacro:macro>
+</robot>

@@ -4,7 +4,7 @@
   <name>exo_control</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="vaggeliskaravas@gmail.com">vaggelis</maintainer>
+  <maintainer email="vaggeliskaravas@gmail.com">Vaggelis Karavas</maintainer>
   <license>TODO: License declaration</license>
 
   <test_depend>ament_copyright</test_depend>
