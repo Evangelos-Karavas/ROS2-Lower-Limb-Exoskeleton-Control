@@ -1,6 +1,8 @@
 # Default initial positions for lleap_exo's ros2_control fake system
 
 initial_positions:
+  base_x: 0
+  base_z: 0
   left_ankle_revolute_joint: 0
   left_hip_revolute_joint: 0
   left_knee_revolute_joint: 0

@@ -30,9 +30,7 @@
     <inertial>
       <origin xyz="0 0 0.5" rpy="0 0 0"/>
       <mass value="1.0"/>
-      <inertia ixx="0.1041667" ixy="0" ixz="0"
-              iyy="0.0885417" iyz="0"
-              izz="0.0260417"/>
+      <inertia ixx="0.1041667" ixy="0" ixz="0" iyy="0.0885417" iyz="0" izz="0.0260417"/>
     </inertial>
     <visual>
       <origin xyz="0 0 0.5" rpy="0 0 0"/>
@@ -153,7 +151,7 @@
     <!-- link1 should be the thigh (joint1 to joint2). In our current STL model, contains the parts of the hip and knee joint visuals. -->
     <link name="${prefix}_${link1}">
       <inertial>
-        <origin xyz="-0.404990833485201 0.00723950792302919 -0.0848264671155734" 
+        <origin xyz="-0.000990833485201 0.00023950792302919 -0.0008264671155734" 
                 rpy="${pi / 2} 0 ${-(180 - 12) * pi / 180}" />
         <mass value="2.27289407400542" />
         <inertia ixx="0.00167557501769417" ixy="-8.47541360240001E-06" ixz="-0.00126944670009916" iyy="0.00777922506609577" iyz="-2.94088009595002E-06" izz="0.00736726690967362" />
@@ -189,7 +187,7 @@
           In our current STL model, contains part of the knee joint visual. -->
     <link name="${prefix}_${link2}">
       <inertial>
-        <origin xyz="-0.210873385399549 -0.0276710830621445 -0.140982468689507" 
+        <origin xyz="-0.000873385399549 -0.0006710830621445 -0.000982468689507" 
                 rpy="${pi / 2} 0 ${-(180 - 34) * pi / 180}" />
         <mass value="1.10275445439595" />
         <inertia ixx="0.00199044634689737" ixy="-7.54331572697175E-06" ixz="-0.00260077424938593" iyy="0.00581565190920448" iyz="-4.96554466328964E-06" izz="0.00412555905043524" />
@@ -290,7 +288,7 @@
   <!-- Legs actually created. -->
   <xacro:leg prefix="right" reflect="1" />
   <xacro:leg prefix="left" reflect="-1.75" />
-  <!-- Gazebo sensors and ros2_control plugin-->
+  <!-- Gazebo sensors and ros2_control plugins-->
   <xacro:exo_gazebo_extensions/>
   <xacro:exo_ros2_control/>
 </robot>

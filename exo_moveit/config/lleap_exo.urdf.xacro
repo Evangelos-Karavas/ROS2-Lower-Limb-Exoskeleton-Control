@@ -6,7 +6,9 @@
     <xacro:include filename="$(find exo_description)/urdf/lleap_exo.urdf.xacro" />
 
     <!-- Import control_xacro -->
-    <xacro:include filename="lleap_exo.ros2_control.xacro" />
+    <xacro:include filename="$(find exo_description)/urdf/lleap_exo_ros2_control.xacro" />
+    <!-- Import gazebo plugins -->
+    <xacro:include filename="$(find exo_description)/urdf/lleap_exo_gazebo_extentions.xacro" />
 
 
     <xacro:lleap_exo_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
