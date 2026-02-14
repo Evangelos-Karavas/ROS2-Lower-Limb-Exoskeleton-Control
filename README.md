@@ -1,99 +1,102 @@
 # 🦿 Exoskeleton ROS2 Project
 
-Special thanks to Max Lewter [LLEAP](https://github.com/MaxLewter16/LLEAP)
+Special thanks to Max Lewter [LLEAP](https://github.com/MaxLewter16/LLEAP) and March exoskeleton [Project March](https://github.com/project-march/ProjectMarch) which were used for details about models joint limits, inertias, and stl files.
 
-This project implements a **ROS-2 Humble based control framework for a powered hip-knee–ankle exoskeleton** using both **phase-variable control** and **neural network–based gait prediction**.  
-It integrates **simulation**, **control**, and **visualization** in Gazebo, MoveIt, and RViz for research on human gait and robotic prosthesis control.
+This project implements a **ROS2 Humble-based control framework for a powered hip-knee-ankle exoskeleton** using both **phase-variable control** and **neural network-based gait prediction**.   It integrates **simulation**, **control**, and **visualization** in Gazebo, MoveIt, and RViz for research on human gait and robotic prosthesis control.
 
 ![alt text](misc/gazebo_robot.png)
+![alt text](misc/gazebo_robot_knee_angles.png)
+
 ## 🧩 Packages
 
 ### `exo_description`
-- Contains the URDF/Xacro model of the exoskeleton.
-- Includes meshes, joint definitions, and physical properties.
-- Used by both Gazebo and MoveIt for kinematic simulation.
-- Launch files load the model into robot_state_publisher.
+- Contains URDF/Xacro model definitions for the exoskeleton.
+- Includes meshes, joint limits, physical parameters, and material colors.
+- Provides ROS2 Control extensions for Gazebo simulation.
 
 ### `exo_gazebo`
-- Provides the Gazebo simulation environment for the exoskeleton.
-- Launch files start Gazebo with exoskeleton model.
+- Simulation environment for the exoskeleton in Gazebo.
+- Launch files: `gazebo.launch.py`, `march_gazebo.launch.py`
 
 ### `exo_control`
-- Core control package containing ROS2 nodes and neural network models for phase-variable and timestamp-based control.
-- Implements gait trajectory generation and joint actuation based on learned CNN/LSTM models.
-- Includes ros2_controller.yaml for controller configuration:
-    - trajectory_controller
-    - joint_state_broadcaster
-- Includes all neural network parameters (models, scalers, and data) used in nodes
+- Core control package with ROS2 nodes for phase-variable and neural network-based control.
+- **Key nodes:**
+    - `joint_publisher_nn.py` — NN-based trajectory generation (LSTM/CNN)
+    - `joint_publisher_pv.py` — Phase-variable trajectory generation
+    - `data_publisher.py` — Patient data visualization
+    - `foot_contact_bool.py` — Foot contact detection
+- **Controller configuration:** `ros2_controller.yaml`
+- **Neural network parameters:** Pre-trained models, scalers, and training data
 
-### `exo_moveit` (Needs Work)
-- Contains MoveIt2 configuration for motion planning and visualization.
-- Provides joint groups for both legs and motion planning parameters.
-- Used for kinematic checks, workspace analysis, and offline trajectory generation.
+### `exo_moveit`
+- MoveIt2 configuration for motion planning and kinematic analysis.
+- Joint groups, collision geometry, and motion planning parameters.
+- Launch files for move group, RViz visualization, and controller spawning.
 
-### `exo_rviz` (Needs Work)
-- Visualization package to launch RViz2 with predefined configurations:
-- Displays joint states and trajectories in real time.
-- Supports monitoring of neural-network-based motion predictions.
+### `exo_rviz`
+- RViz2 visualization configurations for real-time monitoring.
+- Displays joint states, trajectories, and neural network predictions.
 
+### `misc`
+- PlotJuggler configurations and CSV data for trajectory visualization.
+- Helper scripts for data analysis and plotting.
 
-## 🚀 Launching:
-``` 
+## 🚀 Quick Start
+```bash
 colcon build
 source install/setup.bash
 ```
-```
+
+**Launch Gazebo simulation:**
+```bash
 ros2 launch exo_gazebo gazebo.launch.py
 ```
+
+**Launch neural network control:**
+```bash
+ros2 launch exo_control joint_publisher.launch.py
 ```
-ros2 launch exo_control joint_publisher.launch.py       # Launches neural-network node
+
+**Or launch phase-variable control:**
+```bash
+ros2 launch exo_control joint_publisher_pv.launch.py
 ```
-or
-```
-ros2 launch exo_control joint_publisher_pv.launch.py    # Launches phase-variable node
-```
+
 ---
 
-
-## 🧰 Key files:
+## 🧰 Key Files
 | File | Description |
 |------|--------------|
-| `joint_publisher_nn.py` | Publishes predicted joint trajectories from a model (LSTM, CNN) to `/trajectory_controller/joint_trajectory`. |
-| `joint_publisher_pv.py` | Publishes predicted joint trajectories from model with phase variable computation to `/trajectory_controller/joint_trajectory`. |
-| `data_publisher.py` | Publishes patient data on exoskeleton for vizualization purposes. |
-| `ros2_controller.yaml` | Defines Gazebo joint controllers. |
+| `joint_publisher_nn.py` | Publishes NN-predicted joint trajectories using timestamps to `/trajectory_controller/joint_trajectory` |
+| `joint_publisher_pv.py` | Publishes NN-predicted joint trajectories using the phase variable approach to `/trajectory_controller/joint_trajectory` |
+| `data_publisher.py` | Publishes patient data for visualization |
+| `ros2_controller.yaml` | Gazebo controller and broadcaster configuration |
+
 ---
-
-
-## 🧠 Neural Network Files
-The exo_control package uses **TensorFlow/Keras** models trained from gait datasets.
-
-### Models
-- `Timestamp_lstm_model.keras` — LSTM for timestamp-based  gait prediction  
-- `Timestamp_cnn_model.keras` — CNN for timestamp-based trajectory prediction  
-- `PV_lstm_model.keras` — LSTM for phase-variable gait prediction  
-- `PV_cnn_model.keras` — CNN for phase-variable gait prediction  
-
-### Scalers
-- `standard_scaler_typical_lstm.save` — LSTM Scaler for typical patients
-- `standard_scaler_typical_cnn.save` — CNN Scaler for typical patients
-- `standard_scaler_cp_lstm.save` — LSTM Scaler for cerebral palsy patients
-- `standard_scaler_cp_cnn.save` — CNN Scaler for cerebral palsy patients
-
-### Excel files
-- Associated `.xlsx` files store predicted joint angles used in initial states.
----
-
 
 ## ⚙️ ROS2 Topics
-
 | Topic | Message Type | Description |
 |-------|---------------|-------------|
-| `/joint_states` | `sensor_msgs/JointState` | Joint feedback from Gazebo controllers |
-| `/trajectory_controller/joint_trajectory` | `trajectory_msgs/JointTrajectory` | Position controller for both exoskeleton legs |
+| `/joint_states` | `sensor_msgs/JointState` | Joint feedback from Gazebo |
+| `/trajectory_controller/joint_trajectory` | `trajectory_msgs/JointTrajectory` | Command trajectory for exoskeleton |
 | `/phase_variable_left` | `std_msgs/Float32` | Left leg phase variable |
 | `/phase_variable_right` | `std_msgs/Float32` | Right leg phase variable |
+| `/right_sole/in_contact` | `std_msgs/Bool` | Right sole contact Boolean (True or False) |
+| `/left_sole/in_contact` | `std_msgs/Bool` | Left sole contact Boolean (True or False) |
 ---
 
+## 🧠 Neural Network Models
+Located in `neural_network_parameters/models/`:
+- `Timestamp_lstm_model.keras` — LSTM timestamp-based prediction
+- `Timestamp_cnn_model.keras` — CNN timestamp-based prediction
+- `PV_lstm_model.keras` — LSTM phase-variable prediction
+- `PV_cnn_model.keras` — CNN phase-variable prediction
 
-For more information about the NN models and preprocessing of the datasets please look at the project [Neural-Networks-For-Gait-Analysis-and-Prediction](https://github.com/Evangelos-Karavas/Neural-Networks-For-Gait-Analysis-and-Prediction)
+**Scalers** (in `neural_network_parameters/scaler/`):
+- `standard_scaler_typical_*.save` — Typical patient scalers
+- `standard_scaler_cp_*.save` — Cerebral palsy patient scalers
+- `scaler_angles_*.save` — Joint angle scalers
+- `scaler_pv_*.save` — Phase-variable scalers
+---
+
+For more information on neural network models and dataset preprocessing, see [Neural-Networks-For-Gait-Analysis-and-Prediction](https://github.com/Evangelos-Karavas/Neural-Networks-For-Gait-Analysis-and-Prediction).
