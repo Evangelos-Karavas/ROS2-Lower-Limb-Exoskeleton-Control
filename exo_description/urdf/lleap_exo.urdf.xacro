@@ -79,7 +79,7 @@
     <parent link="slider_z"/>
     <child link="slider_x"/>
     <axis xyz="1 0 0"/>
-    <limit lower="-5.0" upper="10.0" effort="500" velocity="1.0"/>
+    <limit lower="-50.0" upper="100.0" effort="500" velocity="1.0"/>
     <dynamics damping="5.0" friction="0.5"/>
   </joint>
   <joint name="base_to_body" type="fixed">
