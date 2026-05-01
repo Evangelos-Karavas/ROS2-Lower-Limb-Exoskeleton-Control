@@ -1,4 +1,4 @@
-# 🦿 Exoskeleton ROS2 Project
+# Exoskeleton ROS2 Project
 
 Special thanks to Max Lewter [LLEAP](https://github.com/MaxLewter16/LLEAP) and March exoskeleton [Project March](https://github.com/project-march/ProjectMarch) which were used for details about models joint limits, inertias, and stl files.
 
@@ -7,7 +7,7 @@ This project implements a **ROS2 Humble-based control framework for a powered hi
 ![alt text](misc/gazebo_robot.png)
 ![alt text](misc/gazebo_robot_knee_angles.png)
 
-## 🧩 Packages
+## Packages
 
 ### `exo_description`
 - Contains URDF/Xacro model definitions for the exoskeleton.
@@ -41,7 +41,47 @@ This project implements a **ROS2 Humble-based control framework for a powered hi
 - PlotJuggler configurations and CSV data for trajectory visualization.
 - Helper scripts for data analysis and plotting.
 
-## 🚀 Quick Start
+## Prerequisites
+
+**Platform:** Ubuntu 22.04 - ROS2 Humble
+
+### System packages
+```bash
+sudo apt install python3-opencv
+```
+> `python3-opencv` (cv2) **must** be the system package installed via apt — do not use `pip install opencv-python`. It must also be imported before TensorFlow in any node that uses both (already handled in the code).
+
+### Python packages
+```bash
+pip install "tensorflow==2.16.2" \
+            "numpy==1.26.4" \
+            "pandas" \
+            "joblib==1.3.2" \
+            "scikit-learn==1.6.1" \
+            "matplotlib" \
+            "setuptools==58.2.0"
+```
+> `setuptools==58.2.0` is required for `colcon build` with ROS2 Humble — newer versions are incompatible.
+> `scikit-learn==1.6.1` must match the version used to save the StandardScaler models.
+
+### ROS2 packages
+Install via `apt` (replace `<pkg>` with package name):
+```bash
+sudo apt install ros-humble-ros2-control \
+                 ros-humble-ros2-controllers \
+                 ros-humble-joint-state-broadcaster \
+                 ros-humble-joint-trajectory-controller \
+                 ros-humble-control-msgs \
+                 ros-humble-ros-gz \
+                 ros-humble-moveit
+```
+
+### GPU support
+TensorFlow 2.16.2 **does not support NVIDIA Blackwell (RTX 5000 series, compute capability 12.0)**. The neural network nodes run on CPU by default. GPU support requires `tf-nightly` in an isolated conda environment — see [TensorFlow GPU guide](https://www.tensorflow.org/install/pip) for details.
+
+---
+
+## Quick Start
 ```bash
 colcon build
 source install/setup.bash
@@ -52,19 +92,19 @@ source install/setup.bash
 ros2 launch exo_gazebo gazebo.launch.py
 ```
 
-**Launch neural network control:**
+**Launch timestamp neural network control:**
 ```bash
 ros2 launch exo_control joint_publisher.launch.py
 ```
 
-**Or launch phase-variable control:**
+**Launch phase-variable neural network control:**
 ```bash
 ros2 launch exo_control joint_publisher_pv.launch.py
 ```
 
 ---
 
-## 🧰 Key Files
+## Key Files
 | File | Description |
 |------|--------------|
 | `joint_publisher_nn.py` | Publishes NN-predicted joint trajectories using timestamps to `/trajectory_controller/joint_trajectory` |
@@ -74,7 +114,7 @@ ros2 launch exo_control joint_publisher_pv.launch.py
 
 ---
 
-## ⚙️ ROS2 Topics
+## ROS2 Topics
 | Topic | Message Type | Description |
 |-------|---------------|-------------|
 | `/joint_states` | `sensor_msgs/JointState` | Joint feedback from Gazebo |
@@ -85,7 +125,7 @@ ros2 launch exo_control joint_publisher_pv.launch.py
 | `/left_sole/in_contact` | `std_msgs/Bool` | Left sole contact Boolean (True or False) |
 ---
 
-## 🧠 Neural Network Models
+## Neural Network Models
 Located in `neural_network_parameters/models/`:
 - `Timestamp_lstm_model.keras` — LSTM timestamp-based prediction
 - `Timestamp_cnn_model.keras` — CNN timestamp-based prediction

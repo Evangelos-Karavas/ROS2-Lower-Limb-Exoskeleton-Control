@@ -8,8 +8,8 @@ from enum import Enum
 import numpy as np
 import pandas as pd
 import rclpy
-from rclpy.node import Node
 
+from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
 from sensor_msgs.msg import JointState
@@ -18,6 +18,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 from ament_index_python.packages import get_package_share_directory
 
+import cv2  # must be imported before tensorflow to avoid protobuf version conflict
 import joblib
 from tensorflow.keras.models import load_model
 
@@ -240,6 +241,17 @@ class JointPublisherPVNextTick(Node):
         self.tick_count = 0
         self.last_predicted_angles_train_deg = self.last_angles_train_deg.copy()
 
+        # Per-tick delta clamp (controller order, degrees)
+        self.max_delta_deg = 3.0
+        self.last_published_angles_ctrl_deg = None
+
+        # Block publishing until this many strides have completed,
+        # or until max_blocked_ticks have elapsed (fallback).
+        self.strides_to_skip = 3
+        self.strides_completed = 0
+        # 500 ticks × 30 ms = 15 s hard timeout
+        self.max_blocked_ticks = 500
+
         # Timer
         self.timer = self.create_timer(self.pub_timer, self._timer_cb)
         self.get_logger().info(
@@ -307,9 +319,14 @@ class JointPublisherPVNextTick(Node):
             qL_deg = -qL_deg
             qR_deg = -qR_deg
 
+        prev_state_L = self.pv_fsm_L.state
         pvL = self.pv_fsm_L.update(qL_deg, self.fcL, t_now)
         pvR = self.pv_fsm_R.update(qR_deg, self.fcR, t_now)
         self.last_pv = (pvL, pvR)
+
+        if prev_state_L == PVState.S4_SWING and self.pv_fsm_L.state == PVState.S1_STANCE:
+            self.strides_completed += 1
+            # self.get_logger().info(f"Stride {self.strides_completed} complete — {'PUBLISHING' if self.strides_completed >= self.strides_to_skip else 'still blocking'}.")
 
         # measured angles in TRAINING ORDER
         try:
@@ -351,10 +368,30 @@ class JointPublisherPVNextTick(Node):
         next_angles_train_deg = self._predict_next_angles_deg_train_order()
         self.last_predicted_angles_train_deg = next_angles_train_deg.copy()
 
-        # 5) map to controller order, knee inversion, publish 1 point
+        # 5) map to controller order, knee inversion, clamp delta
         next_angles_ctrl_deg = self._train_order_deg_to_ctrl_order_deg(next_angles_train_deg)
         next_angles_ctrl_deg[2] = -abs(next_angles_ctrl_deg[2])
         next_angles_ctrl_deg[3] = -abs(next_angles_ctrl_deg[3])
+
+        if self.last_published_angles_ctrl_deg is not None:
+            delta = next_angles_ctrl_deg - self.last_published_angles_ctrl_deg
+            next_angles_ctrl_deg = self.last_published_angles_ctrl_deg + np.clip(
+                delta, -self.max_delta_deg, self.max_delta_deg
+            )
+
+        # Always update the reference so the clamp has a valid baseline when
+        # publishing starts (whether or not we actually sent the command).
+        self.last_published_angles_ctrl_deg = next_angles_ctrl_deg.copy()
+
+        # Block trajectory output until enough strides complete (or timeout)
+        if self.strides_completed < self.strides_to_skip:
+            if self.tick_count < self.max_blocked_ticks:
+                self.tick_count += 1
+                return
+            # self.get_logger().warn(
+            #     f"Timeout after {self.max_blocked_ticks} ticks — forcing publish. "
+            #     f"Check foot-contact topics: {self.fc_topic_left}, {self.fc_topic_right}"
+            # )
 
         msg = JointTrajectory()
         msg.joint_names = self.joint_names_ctrl

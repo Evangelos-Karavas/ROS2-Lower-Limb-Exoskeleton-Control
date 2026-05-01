@@ -29,9 +29,9 @@ class JointPublisherFromModel(Node):
 
         # --- Load model + scaler + initial window from Excel ---
         pkg_dir = get_package_share_directory('exo_control')
-        self.model_path = os.path.join(pkg_dir, 'neural_network_parameters/models', 'Timestamp_cnn_model.keras')
+        self.model_path = os.path.join(pkg_dir, 'neural_network_parameters/models', 'Timestamp_lstm_model.keras')
         self.excel_path = os.path.join(pkg_dir, 'neural_network_parameters/excel', 'timestamps_cp_lstm.xlsx')
-        self.scaler_path = os.path.join(pkg_dir, 'neural_network_parameters/scaler', 'standard_scaler_typical_cnn.save')
+        self.scaler_path = os.path.join(pkg_dir, 'neural_network_parameters/scaler', 'standard_scaler_typical_lstm.save')
 
         self.model = load_model(self.model_path)
         self.scaler = joblib.load(self.scaler_path)
@@ -53,7 +53,7 @@ class JointPublisherFromModel(Node):
             'left_ankle_revolute_joint',
             'right_ankle_revolute_joint'
         ]
-        self.pub_timer = 0.3                # seconds between publishes (20 Hz)
+        self.pub_timer = 0.15               # seconds between publishes (20 Hz)
         self.segment_len = 3                # number of points per message (sliding horizon)
         self.predicted_deg_window = None    # current window in degrees, shape (51, 6)
         self.last_pred_scaled = None        # last window (scaled), for crossfades
