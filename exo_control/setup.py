@@ -52,6 +52,7 @@ setup(
             "joint_publisher = exo_control.joint_publisher_nn:main",
             "joint_publisher_pv = exo_control.joint_publisher_pv:main",
             "foot_contact_bool = exo_control.foot_contact_bool:main",
+            "joint_publisher_hermes_pv = exo_control.joint_publisher_hermes_pv:main",
         ],
     },
 )
