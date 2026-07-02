@@ -1,5 +1,7 @@
 # Exoskeleton ROS2 Project
 
+For more information on neural network models and dataset preprocessing, check my thesis out [Neural-Networks-For-Gait-Analysis-and-Prediction](https://github.com/Evangelos-Karavas/Neural-Networks-For-Gait-Analysis-and-Prediction).
+
 Special thanks to Max Lewter [LLEAP](https://github.com/MaxLewter16/LLEAP) and March exoskeleton [Project March](https://github.com/project-march/ProjectMarch) which were used for details about models joint limits, inertias, and stl files.
 
 This project implements a **ROS2 Humble-based control framework for a powered hip-knee-ankle exoskeleton** using both **phase-variable control** and **neural network-based gait prediction**.   It integrates **simulation**, **control**, and **visualization** in Gazebo, MoveIt, and RViz for research on human gait and robotic prosthesis control.
@@ -138,5 +140,3 @@ Located in `neural_network_parameters/models/`:
 - `scaler_angles_*.save` — Joint angle scalers
 - `scaler_pv_*.save` — Phase-variable scalers
 ---
-
-For more information on neural network models and dataset preprocessing, see [Neural-Networks-For-Gait-Analysis-and-Prediction](https://github.com/Evangelos-Karavas/Neural-Networks-For-Gait-Analysis-and-Prediction).
