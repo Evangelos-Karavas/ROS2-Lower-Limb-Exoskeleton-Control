@@ -53,6 +53,10 @@ setup(
             "joint_publisher_pv = exo_control.joint_publisher_pv:main",
             "foot_contact_bool = exo_control.foot_contact_bool:main",
             "joint_publisher_hermes_pv = exo_control.joint_publisher_hermes_pv:main",
+            "joint_publisher_hermes_pv_lstm_18ch = exo_control.joint_publisher_hermes_pv_lstm_18ch:main",
+            "joint_publisher_hermes_pv_cnn_18ch = exo_control.joint_publisher_hermes_pv_cnn_18ch:main",
+            "joint_publisher_hermes_ts_lstm_18ch = exo_control.joint_publisher_hermes_ts_lstm_18ch:main",
+            "joint_publisher_hermes_ts_cnn_18ch = exo_control.joint_publisher_hermes_ts_cnn_18ch:main",
         ],
     },
 )

@@ -48,12 +48,17 @@ This project implements a **ROS2 Humble-based control framework for a powered hi
 **Platform:** Ubuntu 22.04 - ROS2 Humble
 
 ### System packages
+Install the required packages for running the neural network models.
+```bash
+pip install -r requirements.txt
+```
+and
 ```bash
 sudo apt install python3-opencv
 ```
 > `python3-opencv` (cv2) **must** be the system package installed via apt — do not use `pip install opencv-python`. It must also be imported before TensorFlow in any node that uses both (already handled in the code).
 
-### Python packages
+### Python packages (Already inside the requirements.txt file)
 ```bash
 pip install "tensorflow==2.16.2" \
             "numpy==1.26.4" \
